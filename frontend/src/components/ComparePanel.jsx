@@ -1,4 +1,5 @@
 import React from 'react';
+import { Localized } from '../i18n';
 
 const score = (value) => Number(value).toFixed(2);
 
@@ -10,7 +11,7 @@ export function ComparePanel({ catalog, saved, current, onSave, onClear }) {
     `${measure_id} ${measures.get(measure_id)?.scope === 'city' ? 'город' : districts.get(district_id) || district_id}`
   ).join(' · ');
 
-  return <section id="compare" className="panel compare-panel" aria-labelledby="compare-title">
+  return <Localized><section id="compare" className="panel compare-panel" aria-labelledby="compare-title">
     <div className="section-heading"><div><span className="section-kicker">04 / СРАВНЕНИЕ</span><h2 id="compare-title">Проверьте другой набор</h2>
       <p>Сохраните результат в этом браузере, измените меры и рассчитайте снова. Оба результата считаются из одной исходной базы.</p></div>
       {current && <button type="button" className="button button--light" onClick={onSave}>{saved ? 'Заменить сохранённый' : 'Сохранить для сравнения'}</button>}
@@ -28,5 +29,5 @@ export function ComparePanel({ catalog, saved, current, onSave, onClear }) {
           <p className="table-note">Наборы имеют версию данных {catalog.version}. Сравнение использует только ответы сервера.</p>
         </> : <p className="compare-prompt">Сценарий сохранён. Измените одну из мер или район и рассчитайте новый набор.</p>}
       </> : <div className="empty-state empty-state--compact"><span aria-hidden="true">↗</span><h3>Первый результат ещё не сохранён</h3><p>После расчёта сохраните его здесь. Например, перенесите M7 из Нуры в Есиль и сравните Score.</p></div>}
-  </section>;
+  </section></Localized>;
 }
