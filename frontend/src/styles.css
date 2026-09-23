@@ -176,6 +176,25 @@ thead th { color: #61756d; font-size: .75rem; font-weight: 800; background: #f5f
 .analysis-card--strengths { border-top: 4px solid #3da082; }
 .analysis-card--risks { border-top: 4px solid #d5906b; }
 .analysis-card--recommendations { border-top: 4px solid #6e9bc1; }
+.alternatives { margin-top: 24px; padding-top: 24px; border-top: 1px solid #dce8dd; }
+.alternatives-heading { display: flex; justify-content: space-between; align-items: end; gap: 22px; margin-bottom: 16px; }
+.alternatives-heading h3 { margin: 5px 0 0; font-size: 1.45rem; }
+.alternatives-heading p { max-width: 550px; margin: 0; color: #65796e; font-size: .82rem; }
+.alternatives-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.alternative-card { display: flex; flex-direction: column; min-width: 0; padding: 18px; border: 1px solid #dce9d9; border-radius: 15px; background: #fff; }
+.alternative-card__gain { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid #e7eee5; }
+.alternative-card__gain span { color: #657a71; font-size: .82rem; }
+.alternative-card__gain span b { color: #234b45; }
+.alternative-card__gain > strong { padding: 5px 9px; color: #1d7256; background: #e2f2e5; border-radius: 8px; font-size: 1.05rem; }
+.alternative-card__change { margin: 13px 0 0; color: #25413d; font-size: .85rem; font-weight: 700; }
+.alternative-card__change > span { display: block; margin-bottom: 3px; color: #789085; font-size: .72rem; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; }
+.alternative-card__facts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 15px 0; color: #637a6e; font-size: .77rem; }
+.alternative-card__facts b { color: #31564c; }
+.alternative-card__tradeoffs { margin: 0 0 18px; padding: 11px 13px; border-radius: 9px; background: #fff5ec; color: #92583e; font-size: .76rem; }
+.alternative-card__tradeoffs ul { margin: 6px 0 0; padding-left: 17px; }
+.alternative-card__tradeoffs li + li { margin-top: 4px; }
+.alternative-card .button { width: 100%; margin-top: auto; }
+.alternatives-empty { margin: 0; padding: 14px 17px; border-radius: 11px; background: #edf4ec; color: #5c7466; font-size: .86rem; }
 .analysis-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-top: 19px; }
 .analysis-footer p { margin: 0; color: #718278; font-size: .79rem; }
 .analysis-pending, .loading-panel { display: flex; align-items: center; gap: 18px; color: #325e54; }
@@ -229,6 +248,8 @@ thead th { color: #61756d; font-size: .75rem; font-weight: 800; background: #f5f
   .district-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .score-formula { grid-template-columns: 1fr 1fr; }
   .analysis-grid { grid-template-columns: 1fr; }
+  .alternatives-heading { align-items: start; flex-direction: column; gap: 8px; }
+  .alternatives-grid { grid-template-columns: 1fr; }
   .footer { flex-direction: column; }
 }
 @media (max-width: 520px) {

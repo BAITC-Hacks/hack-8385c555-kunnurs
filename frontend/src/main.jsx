@@ -74,13 +74,11 @@ function App() {
     setRequestError('');
   }
 
-  async function calculate(event) {
-    event?.preventDefault();
-    if (!preview?.valid || busy) return;
+  async function requestAnalysis(nextDecisions) {
     setBusy(true);
     setRequestError('');
     setResponse(null);
-    const payload = { decisions: decisions.map(({ measure_id, district_id }) =>
+    const payload = { decisions: nextDecisions.map(({ measure_id, district_id }) =>
       district_id == null ? { measure_id } : { measure_id, district_id }) };
     try {
       const data = await api('/api/simulations/analyze', { body: payload });
@@ -93,6 +91,24 @@ function App() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function calculate(event) {
+    event?.preventDefault();
+    if (!preview?.valid || busy) return;
+    void requestAnalysis(decisions);
+  }
+
+  function tryAlternative(alternative) {
+    if (busy || !Array.isArray(alternative?.scenario?.decisions)) return;
+    const nextDecisions = alternative.scenario.decisions.map(({ measure_id, district_id }) => ({ measure_id, district_id: district_id ?? null }));
+    if (!previewScenario(nextDecisions, catalog).valid) {
+      setRequestError('Сервер предложил недопустимый набор мер. Обновите страницу и попробуйте снова.');
+      return;
+    }
+    setDecisions(nextDecisions);
+    if (alternative.added?.district_id) setSelectedDistrict(alternative.added.district_id);
+    void requestAnalysis(nextDecisions);
   }
 
   function saveComparison() {
@@ -138,7 +154,7 @@ function App() {
         <ScenarioEditor catalog={catalog} decisions={decisions} preview={preview} busy={busy} onChange={changeDecision} onSubmit={calculate} onRestore={restoreDemo} onClear={clearDecisions} />
         {requestError && <div className="request-error" role="alert"><div><strong>Сценарий не рассчитан</strong><p>{requestError}</p></div><button type="button" className="button button--light" onClick={calculate}>Повторить</button></div>}
         <DistrictResults catalog={catalog} baseline={baseline} result={result} selectedDistrict={selectedDistrict} onSelect={setSelectedDistrict} hasScenario={Boolean(response)} />
-        <AnalysisPanel analysis={response?.analysis} busy={busy} onRetry={calculate} />
+        <AnalysisPanel analysis={response?.analysis} alternatives={response?.alternatives} catalog={catalog} busy={busy} onRetry={calculate} onTryAlternative={tryAlternative} />
         <ComparePanel catalog={catalog} saved={saved} current={response?.result} onSave={saveComparison} onClear={clearComparison} />
       </>}
     </main>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alternatives } from './Alternatives';
 
 const modeLabels = {
   live: 'AI: live',
@@ -12,7 +13,7 @@ const sourceLabels = {
   template: 'Шаблонное объяснение',
 };
 
-export function AnalysisPanel({ analysis, busy, onRetry }) {
+export function AnalysisPanel({ analysis, alternatives, catalog, busy, onRetry, onTryAlternative }) {
   const mode = analysis?.mode;
   return <section id="analysis" className="panel analysis-panel" aria-labelledby="analysis-title" aria-live="polite">
     <div className="section-heading"><div><span className="section-kicker">03 / АНАЛИЗ</span><h2 id="analysis-title">Почему получился такой результат</h2>
@@ -28,7 +29,8 @@ export function AnalysisPanel({ analysis, busy, onRetry }) {
           ['Риски и компромиссы', 'risks', 'risks'],
           ['Что проверить дальше', 'recommendations', 'recommendations'],
         ].map(([title, key, style]) => <div className={`analysis-card analysis-card--${style}`} key={key}><h3>{title}</h3><ul>{analysis[key].map((item, index) => <li key={index}>{item}</li>)}</ul></div>)}</div>
-        <div className="analysis-footer"><p>Советы AI — гипотезы. Проверяйте альтернативные наборы новым расчётом.</p><button type="button" className="button button--light" onClick={onRetry}>Повторить анализ</button></div>
+        <Alternatives alternatives={alternatives} catalog={catalog} busy={busy} onTry={onTryAlternative} />
+        <div className="analysis-footer"><p>Текст AI помогает понять результат. Цифры альтернатив рассчитаны сервером.</p><button type="button" className="button button--light" onClick={onRetry}>Повторить анализ</button></div>
       </> : <div className="empty-state"><span aria-hidden="true">✦</span><h3>Анализ появится после расчёта</h3><p>Выберите пять мер и нажмите «Рассчитать и получить AI-анализ».</p></div>}
   </section>;
 }
