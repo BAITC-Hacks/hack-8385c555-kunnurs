@@ -1,0 +1,240 @@
+{
+  "dataset_version": "hackalem-districts-v1",
+  "budget": 100,
+  "total_cost": 95,
+  "remaining_budget": 5,
+  "score": 56.54307,
+  "baseline_score": 52.55768,
+  "score_delta": 3.98539,
+  "weighted_average": 58.0776,
+  "weakest_district_score": 52.9625,
+  "critical_count": 0,
+  "critical_indicators": [],
+  "districts": [
+    {
+      "district_id": "esil",
+      "name": "Есиль",
+      "indicators": {
+        "T1": 45.0,
+        "T2": 62.0,
+        "E1": 68.0,
+        "E2": 72.0,
+        "S1": 48.0,
+        "S2": 55.0,
+        "B1": 78.0,
+        "B2": 60.0,
+        "C1": 75.0,
+        "C2": 74.375
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 0.0,
+        "S1": 0.0,
+        "S2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "C1": 0.0,
+        "C2": 4.375
+      },
+      "score": 63.4275,
+      "score_delta": 0.4375
+    },
+    {
+      "district_id": "almaty",
+      "name": "Алматы",
+      "indicators": {
+        "T1": 40.0,
+        "T2": 75.0,
+        "E1": 50.0,
+        "E2": 55.0,
+        "S1": 60.0,
+        "S2": 65.0,
+        "B1": 62.0,
+        "B2": 52.0,
+        "C1": 50.0,
+        "C2": 64.375
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 0.0,
+        "S1": 0.0,
+        "S2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "C1": 0.0,
+        "C2": 4.375
+      },
+      "score": 57.4975,
+      "score_delta": 0.4375
+    },
+    {
+      "district_id": "saryarka",
+      "name": "Сарыарка",
+      "indicators": {
+        "T1": 50.0,
+        "T2": 70.0,
+        "E1": 42.0,
+        "E2": 48.75,
+        "S1": 62.0,
+        "S2": 68.0,
+        "B1": 58.0,
+        "B2": 55.0,
+        "C1": 47.5,
+        "C2": 59.375
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 8.75,
+        "S1": 0.0,
+        "S2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "C1": 2.5,
+        "C2": 4.375
+      },
+      "score": 56.3,
+      "score_delta": 1.65
+    },
+    {
+      "district_id": "baikonur",
+      "name": "Байконур",
+      "indicators": {
+        "T1": 52.0,
+        "T2": 68.0,
+        "E1": 55.0,
+        "E2": 50.0,
+        "S1": 58.0,
+        "S2": 60.0,
+        "B1": 52.0,
+        "B2": 58.0,
+        "C1": 55.0,
+        "C2": 62.375
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 0.0,
+        "S1": 0.0,
+        "S2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "C1": 0.0,
+        "C2": 4.375
+      },
+      "score": 57.0675,
+      "score_delta": 0.4375
+    },
+    {
+      "district_id": "nura",
+      "name": "Нура",
+      "indicators": {
+        "T1": 55.0,
+        "T2": 40.0,
+        "E1": 45.0,
+        "E2": 65.0,
+        "S1": 48.0,
+        "S2": 43.75,
+        "B1": 67.5,
+        "B2": 51.75,
+        "C1": 60.0,
+        "C2": 54.375
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 0.0,
+        "S1": 10.0,
+        "S2": 8.75,
+        "B1": 12.5,
+        "B2": 1.75,
+        "C1": 0.0,
+        "C2": 4.375
+      },
+      "score": 52.9625,
+      "score_delta": 3.7825
+    }
+  ],
+  "measure_effects": [
+    {
+      "measure_id": "M10",
+      "cost": 12,
+      "realized_fraction": 0.875,
+      "district_ids": [
+        "nura"
+      ],
+      "effects": {
+        "B1": 10.5,
+        "B2": 1.75
+      }
+    },
+    {
+      "measure_id": "M12",
+      "cost": 14,
+      "realized_fraction": 0.875,
+      "district_ids": [
+        "esil",
+        "almaty",
+        "saryarka",
+        "baikonur",
+        "nura"
+      ],
+      "effects": {
+        "C2": 4.375
+      }
+    },
+    {
+      "measure_id": "M5",
+      "cost": 25,
+      "realized_fraction": 0.625,
+      "district_ids": [
+        "saryarka"
+      ],
+      "effects": {
+        "E2": 8.75,
+        "C1": 2.5
+      }
+    },
+    {
+      "measure_id": "M7",
+      "cost": 24,
+      "realized_fraction": 0.625,
+      "district_ids": [
+        "nura"
+      ],
+      "effects": {
+        "S1": 10.0
+      }
+    },
+    {
+      "measure_id": "M8",
+      "cost": 20,
+      "realized_fraction": 0.625,
+      "district_ids": [
+        "nura"
+      ],
+      "effects": {
+        "S2": 8.75
+      }
+    }
+  ],
+  "applied_synergies": [
+    {
+      "measures": [
+        "M10",
+        "M12"
+      ],
+      "district_id": "nura",
+      "effects": {
+        "B1": 2.0
+      }
+    }
+  ]
+}

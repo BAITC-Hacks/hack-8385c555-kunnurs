@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": "invalid_scenario",
+    "message": "Набор решений не прошёл проверку.",
+    "issues": [
+      {
+        "code": "decision_count",
+        "message": "Нужно выбрать ровно 5 мероприятий."
+      }
+    ]
+  }
+}

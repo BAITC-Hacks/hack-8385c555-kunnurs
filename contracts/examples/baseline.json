@@ -1,0 +1,178 @@
+{
+  "dataset_version": "hackalem-districts-v1",
+  "budget": 100,
+  "total_cost": 0,
+  "remaining_budget": 100,
+  "score": 52.55768,
+  "baseline_score": 52.55768,
+  "score_delta": 0.0,
+  "weighted_average": 56.8624,
+  "weakest_district_score": 49.18,
+  "critical_count": 2,
+  "critical_indicators": [
+    {
+      "district_id": "nura",
+      "metric": "S1",
+      "value": 38.0
+    },
+    {
+      "district_id": "nura",
+      "metric": "S2",
+      "value": 35.0
+    }
+  ],
+  "districts": [
+    {
+      "district_id": "esil",
+      "name": "Есиль",
+      "indicators": {
+        "T1": 45.0,
+        "T2": 62.0,
+        "E1": 68.0,
+        "E2": 72.0,
+        "S1": 48.0,
+        "S2": 55.0,
+        "B1": 78.0,
+        "B2": 60.0,
+        "C1": 75.0,
+        "C2": 70.0
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 0.0,
+        "S1": 0.0,
+        "S2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "C1": 0.0,
+        "C2": 0.0
+      },
+      "score": 62.99,
+      "score_delta": 0.0
+    },
+    {
+      "district_id": "almaty",
+      "name": "Алматы",
+      "indicators": {
+        "T1": 40.0,
+        "T2": 75.0,
+        "E1": 50.0,
+        "E2": 55.0,
+        "S1": 60.0,
+        "S2": 65.0,
+        "B1": 62.0,
+        "B2": 52.0,
+        "C1": 50.0,
+        "C2": 60.0
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 0.0,
+        "S1": 0.0,
+        "S2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "C1": 0.0,
+        "C2": 0.0
+      },
+      "score": 57.06,
+      "score_delta": 0.0
+    },
+    {
+      "district_id": "saryarka",
+      "name": "Сарыарка",
+      "indicators": {
+        "T1": 50.0,
+        "T2": 70.0,
+        "E1": 42.0,
+        "E2": 40.0,
+        "S1": 62.0,
+        "S2": 68.0,
+        "B1": 58.0,
+        "B2": 55.0,
+        "C1": 45.0,
+        "C2": 55.0
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 0.0,
+        "S1": 0.0,
+        "S2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "C1": 0.0,
+        "C2": 0.0
+      },
+      "score": 54.65,
+      "score_delta": 0.0
+    },
+    {
+      "district_id": "baikonur",
+      "name": "Байконур",
+      "indicators": {
+        "T1": 52.0,
+        "T2": 68.0,
+        "E1": 55.0,
+        "E2": 50.0,
+        "S1": 58.0,
+        "S2": 60.0,
+        "B1": 52.0,
+        "B2": 58.0,
+        "C1": 55.0,
+        "C2": 58.0
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 0.0,
+        "S1": 0.0,
+        "S2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "C1": 0.0,
+        "C2": 0.0
+      },
+      "score": 56.63,
+      "score_delta": 0.0
+    },
+    {
+      "district_id": "nura",
+      "name": "Нура",
+      "indicators": {
+        "T1": 55.0,
+        "T2": 40.0,
+        "E1": 45.0,
+        "E2": 65.0,
+        "S1": 38.0,
+        "S2": 35.0,
+        "B1": 55.0,
+        "B2": 50.0,
+        "C1": 60.0,
+        "C2": 50.0
+      },
+      "indicator_deltas": {
+        "T1": 0.0,
+        "T2": 0.0,
+        "E1": 0.0,
+        "E2": 0.0,
+        "S1": 0.0,
+        "S2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "C1": 0.0,
+        "C2": 0.0
+      },
+      "score": 49.18,
+      "score_delta": 0.0
+    }
+  ],
+  "measure_effects": [],
+  "applied_synergies": []
+}

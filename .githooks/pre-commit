@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ -f .venv/Scripts/python.exe ]]; then
+  .venv/Scripts/python.exe scripts/check_role.py
+elif [[ -x .venv/bin/python ]]; then
+  .venv/bin/python scripts/check_role.py
+else
+  python scripts/check_role.py
+fi
