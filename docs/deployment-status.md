@@ -1,5 +1,17 @@
 # Фактический статус публикации
 
+## Обновление: интеграция live AI, 23.09.2026 10:30 UTC
+
+- В OPS интегрирован `origin/main` до `e5776fb` с сохранением файлов деплоя и авторства коммитов LEAD.
+- Обязательная проверка: 66 тестов, импорт приложения и Vite build — PASS. OPS: 80 in-process mock, 32 in-process fallback, 80 против обновлённого контейнера — PASS.
+- Исправлена упаковка обязательного `ai/cache/__init__.py`. В Dockerfile добавлена проверка создания приложения от UID 10001 при сборке.
+- Docker build — PASS, тег `akim-city:ops`, config ID `sha256:001aca6b0424410896e9cdb1fe60622cd7953e8d43d8b0a82ed2f5a371b750b2`.
+- Контейнер `akim-demo` работает на `http://localhost:8000`, запущен с `--env-file .env -e AI_MODE=live`. Создан локальный `.env`, исключённый из Git и образа.
+- HTTP smoke — PASS: Score 56.54307, 2 assets, `mode=fallback`, `source=template`, `reason=missing_api_key`. Свежий ответ провайдера пока НЕ подтверждён: нужен ключ владельца и пересоздание контейнера после заполнения `.env`.
+- Публичного URL по-прежнему нет. Браузерное демо ниже относится к прежнему mock-образу.
+
+## Предыдущий прогон mock-образа, 23.09.2026 09:54 UTC
+
 | Поле | Значение |
 |---|---|
 | Дата | 23.09.2026 |
@@ -7,7 +19,7 @@
 | Платформа | Не согласована; подготовлены Render и Railway |
 | Публичный URL | Не получен, публикация не выполнена |
 | Версия проверки | OPS-изменения этой ветки на базе `lead: integrate remote history with completed README`; hash OPS-коммита см. в Git |
-| AI | По коду mock; live возвращает fallback |
+| AI | Прежний образ: mock, live-адаптер ещё не был интегрирован |
 | Docker build | PASS, `akim-city:ops`; ID `sha256:b31390fe7225f5e5214c6600bc72f6e8b63281dbd1e83a0a3966b82c2c8fa573` |
 | Обязательный check | PASS: 32 теста, импорт приложения, production-сборка Vite |
 | OPS pytest | PASS: 79 in-process mock; 31 in-process fallback; 79 с API контейнера, без пропусков |

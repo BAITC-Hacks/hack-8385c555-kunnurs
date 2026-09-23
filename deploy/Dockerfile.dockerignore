@@ -26,4 +26,5 @@
 **/*.key
 backend/tests/
 contracts/tests/
-ai/cache/
+ai/cache/*
+!ai/cache/__init__.py
