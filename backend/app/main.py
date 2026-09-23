@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from ai.agent import explain_scenario
+from ai.agent import configured_mode, explain_scenario
 from backend.app.seed import ROOT, get_catalog
 from backend.app.services.simulation import InvalidScenario, baseline, evaluate
 from contracts.schemas import (
@@ -17,7 +17,7 @@ from contracts.schemas import (
 )
 
 load_dotenv(ROOT / ".env")
-AI_MODE = os.getenv("AI_MODE", "mock")
+AI_MODE = os.getenv("AI_MODE", "live")
 if AI_MODE not in {"mock", "live"}:
     raise ValueError("AI_MODE must be mock or live")
 
@@ -49,7 +49,7 @@ async def validation_handler(request: Request, exc: RequestValidationError) -> J
 
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse(dataset_version=get_catalog().version, ai_mode="mock" if AI_MODE == "mock" else "fallback")
+    return HealthResponse(dataset_version=get_catalog().version, ai_mode=configured_mode(AI_MODE))
 
 
 @app.get("/api/catalog", response_model=Catalog)

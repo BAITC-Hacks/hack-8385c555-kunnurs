@@ -169,6 +169,16 @@ class Analysis(Contract):
     risks: list[str]
     recommendations: list[str]
     notice: str
+    source: Literal["provider", "cache", "template"] = "template"
+    reason: str | None = None
+
+
+class AINarrative(Contract):
+    """Provider-only schema: numeric summary and score never come from the LLM."""
+
+    strengths: list[Annotated[str, Field(min_length=1, max_length=450)]] = Field(min_length=1, max_length=4)
+    risks: list[Annotated[str, Field(min_length=1, max_length=450)]] = Field(min_length=1, max_length=4)
+    recommendations: list[Annotated[str, Field(min_length=1, max_length=450)]] = Field(min_length=1, max_length=4)
 
 
 class AnalysisResponse(Contract):

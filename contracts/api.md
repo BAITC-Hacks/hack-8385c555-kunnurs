@@ -32,6 +32,12 @@ JSON UTF-8. Базовый URL локально `http://localhost:8000`. Тип�
 
 Коды причин: `decision_count`, `duplicate_measure`, `unknown_measure`, `invalid_district`, `city_has_district`, `budget_exceeded`, `direction_limit`, `incompatible_measures`. Нарушение JSON-схемы: `error.code=invalid_request`, причина `schema_validation`. У ошибки нет поля `score`.
 
-`analysis.mode`: `mock` — шаблон; `live` зарезервирован для настоящего LLM; `fallback` — живой провайдер недоступен/ещё не реализован. Отображать `notice` пользователю. Сейчас `AI_MODE=live` явно возвращает fallback и не делает сетевых запросов. Режим никогда не влияет на Score.
+`analysis.mode`: `mock` — явно выбранный шаблон; `live` — проверенный ответ LLM или его кэш; `fallback` — живой провайдер недоступен/ответ не прошёл проверку. Всегда отображать `notice`. Режим не влияет на Score.
+
+Новые обратно совместимые поля: `analysis.source` = `provider` / `cache` / `template` (default `template`); `analysis.reason` = код причины fallback или `null`. Коды: `missing_api_key`, `invalid_configuration`, `timeout`, `connection_error`, `authentication_error`, `permission_error`, `rate_limit`, `provider_error`, `invalid_output`. Внутренние ошибки/ключи в ответ не попадают. Fallback — HTTP 200 с корректным рассчитанным `result`; невалидный сценарий по-прежнему 422 и не вызывает AI.
+
+`/api/health.ai_mode` показывает готовность конфигурации: `live`, если выбран live, настройки валидны и ключ заполнен. Health не вызывает провайдера и не доказывает доступность модели или наличие квоты. Фактический режим конкретного запроса смотреть в `analysis.mode`.
+
+AI получает результат расчёта, выбранные меры, правила и конфликты. Провайдерная схема `AINarrative` в schemas.py содержит только три списка качественного текста; `summary`, Score, notice/mode и метаданные определяет сервер. Числовые утверждения в ответе LLM запрещены, текст с цифрами отклоняется. Инструкции и настройка: `ai/README.md`.
 
 Изменения контракта согласовывает LEAD. Добавлять совместимые необязательные поля; одновременно обновлять схемы, API-документ, примеры и тесты. FRONTEND и OPS не редактируют контракт самостоятельно.
