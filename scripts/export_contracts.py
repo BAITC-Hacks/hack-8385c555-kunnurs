@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ai.agent import explain_scenario
 from backend.app.seed import get_catalog
-from backend.app.services.simulation import InvalidScenario, baseline, evaluate
+from backend.app.services.simulation import InvalidScenario, baseline, evaluate, leave_one_out
 from backend.app.services.advice import find_alternatives
 from contracts.schemas import AnalysisResponse, ErrorBody, ErrorResponse, HealthResponse, ScenarioRequest
 
@@ -26,7 +26,7 @@ def example_models() -> dict:
         "catalog.json": catalog,
         "baseline.json": baseline(catalog),
         "evaluation.json": result,
-        "analysis.json": AnalysisResponse(result=result, alternatives=alternatives, analysis=explain_scenario(result, catalog, alternatives=alternatives)),
+        "analysis.json": AnalysisResponse(result=result, alternatives=alternatives, contributions=leave_one_out(result, catalog), analysis=explain_scenario(result, catalog, alternatives=alternatives)),
         "error.json": error,
     }
 

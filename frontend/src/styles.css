@@ -21,6 +21,13 @@ small { padding-bottom: 12px; }
 .analysis-status { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .analysis-status .notice { flex: 1 1 300px; margin: 0; }
 .ai-badge { display: inline-block; padding: 7px 12px; border-radius: 999px; background: #e5f1f8; color: #155f8e; font-weight: 700; white-space: nowrap; }
+.alternatives { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.alternative { min-width: 0; border: 1px solid #c4d6e2; border-radius: 10px; padding: 18px; display: flex; flex-direction: column; }
+.alternative button { margin-top: auto; align-self: flex-start; }
+.objective-labels { display: flex; flex-wrap: wrap; gap: 6px; }
+.objective-labels span { font-size: .85rem; font-weight: 650; color: #155f8e; background: #e5f1f8; border-radius: 6px; padding: 4px 8px; }
+li { margin-bottom: 8px; }
+button:focus-visible, select:focus-visible { outline: 3px solid #d37900; outline-offset: 3px; }
 .error, .danger { color: #a21c1c; }
 .table-scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; text-align: left; }

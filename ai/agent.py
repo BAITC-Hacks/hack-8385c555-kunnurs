@@ -14,7 +14,7 @@ from ai.evidence import build_evidence, composition
 from ai.privacy import redact
 from ai.prompts import PROMPT_VERSION, SYSTEM_PROMPT
 from ai.settings import AISettings
-from contracts.schemas import AINarrative, AISelection, Analysis, AnalysisEvidence, Catalog, ScenarioAlternative, SimulationResult
+from contracts.schemas import AINarrative, AISelection, Analysis, AnalysisEvidence, Catalog, MeasureContribution, ScenarioAlternative, SimulationResult
 
 logger = logging.getLogger(__name__)
 
@@ -72,10 +72,11 @@ def _validate_selection(selection: AISelection, evidence: AnalysisEvidence) -> A
 
 def _render(selection: AISelection, evidence: AnalysisEvidence) -> AINarrative:
     _validate_selection(selection, evidence)
+    risk_ids = list(dict.fromkeys([*evidence.mandatory_risk_ids, *selection.risk_ids]))
     return AINarrative(
         strengths=[redact(evidence.strengths[key]) for key in selection.strength_ids],
-        risks=[redact(evidence.risks[key]) for key in selection.risk_ids],
-        recommendations=[redact(evidence.recommendations[key]) for key in selection.recommendation_ids],
+        risks=[redact(evidence.risks[key]) for key in risk_ids],
+        recommendations=[redact(text) for text in evidence.recommendations.values()],
     )
 
 
@@ -131,7 +132,7 @@ def _live(result: SimulationResult, catalog: Catalog, evidence: AnalysisEvidence
     narrative = _render(selection, evidence)
     return Analysis(
         mode="live", source=source, summary=_summary(result, catalog), **narrative.model_dump(),
-        notice="AI-разбор по рассчитанным показателям: модель выбрала приоритетные факты и советы, их текст проверен сервером." if source == "provider" else "Сохранённый AI-разбор: модель выбрала приоритеты, факты и альтернативы проверены сервером.",
+        notice=("AI-разбор" if source == "provider" else "Сохранённый AI-разбор") + ": модель выделила сильные стороны и дополнительные риски. Обязательные риски и все проверенные замены показаны сервером независимо от выбора AI.",
     )
 
 
@@ -142,9 +143,10 @@ def explain_scenario(
     mode: str = "mock",
     tools: Mapping[str, Callable] | None = None,
     alternatives: list[ScenarioAlternative] | None = None,
+    contributions: list[MeasureContribution] | None = None,
 ) -> Analysis:
     # No tool declarations are sent to the model. Arbitrary callbacks are never run.
-    evidence = build_evidence(result, catalog, alternatives)
+    evidence = build_evidence(result, catalog, alternatives, contributions)
     if mode == "live":
         return _live(result, catalog, evidence)
     return _template(result, catalog, evidence)
@@ -154,11 +156,14 @@ def _template(result: SimulationResult, catalog: Catalog, evidence: AnalysisEvid
     if reason:
         # Only a fixed reason code is logged, never exception bodies, prompts or keys.
         logger.warning("ai_fallback reason=%s", reason)
+    narrative = _render(AISelection(
+        strength_ids=list(evidence.strengths)[:2],
+        risk_ids=[key for key in evidence.risks if key not in evidence.mandatory_risk_ids][:2],
+        recommendation_ids=list(evidence.recommendations)[:2],
+    ), evidence)
     return Analysis(
         mode="fallback" if reason else "mock", source="template", reason=reason,
         summary=_summary(result, catalog),
-        strengths=[redact(text) for text in list(evidence.strengths.values())[:2]],
-        risks=[redact(text) for text in list(evidence.risks.values())[:2]],
-        recommendations=[redact(text) for text in list(evidence.recommendations.values())[:2]],
+        **narrative.model_dump(),
         notice=FALLBACK_NOTICES[reason] if reason else "Шаблонное объяснение: включён режим mock.",
     )

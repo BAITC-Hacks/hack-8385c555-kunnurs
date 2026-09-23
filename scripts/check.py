@@ -31,6 +31,7 @@ def main() -> None:
         npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")
         if not npm:
             raise SystemExit("npm is required for the frontend build")
+        run([npm, "test"], cwd=ROOT / "frontend")
         run([npm, "run", "build"], cwd=ROOT / "frontend")
     elif "--require-frontend" in sys.argv:
         raise SystemExit("Install frontend dependencies with npm ci first")

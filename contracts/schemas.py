@@ -175,6 +175,17 @@ class ScenarioAlternative(Contract):
     remaining_budget: int
     critical_count: int
     tradeoffs: list[str]
+    objectives: list[Literal["best_score", "lowest_cost", "most_critical"]] = Field(default_factory=list)
+
+
+class MeasureContribution(Contract):
+    """Conditional leave-one-out effect, not an additive allocation of Score."""
+
+    decision: Decision
+    cost: int
+    score_without: float
+    score_contribution: float
+    critical_count_without: int
 
 
 class Analysis(Contract):
@@ -208,12 +219,14 @@ class AnalysisEvidence(Contract):
     strengths: dict[str, str]
     risks: dict[str, str]
     recommendations: dict[str, str]
+    mandatory_risk_ids: list[str] = Field(default_factory=list)
 
 
 class AnalysisResponse(Contract):
     result: SimulationResult
     analysis: Analysis
     alternatives: list[ScenarioAlternative] = Field(default_factory=list)
+    contributions: list[MeasureContribution] = Field(default_factory=list)
 
 
 class HealthResponse(Contract):

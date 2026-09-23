@@ -10,7 +10,8 @@ METRIC_NAMES = {
 }
 
 
-def find_alternatives(request: ScenarioRequest, catalog: Catalog) -> list[ScenarioAlternative]:
+def improving_replacements(request: ScenarioRequest, catalog: Catalog) -> list[ScenarioAlternative]:
+    """All valid Score-improving replacements, with deterministic tie breaking."""
     current = evaluate(request, catalog)
     before = {d.district_id: d for d in current.districts}
     choices = [
@@ -46,4 +47,21 @@ def find_alternatives(request: ScenarioRequest, catalog: Catalog) -> list[Scenar
                 remaining_budget=result.remaining_budget, critical_count=result.critical_count, tradeoffs=tradeoffs,
             ))
     improvements.sort(key=lambda item: (-item.score_gain, item.total_cost, item.id))
-    return improvements[:3]
+    return improvements
+
+
+def find_alternatives(request: ScenarioRequest, catalog: Catalog) -> list[ScenarioAlternative]:
+    improvements = improving_replacements(request, catalog)
+    if not improvements:
+        return []
+    winners = [
+        ("best_score", improvements[0]),
+        ("lowest_cost", min(improvements, key=lambda a: (a.total_cost, -a.score_gain, a.id))),
+        ("most_critical", min(improvements, key=lambda a: (a.critical_count, -a.score_gain, a.total_cost, a.id))),
+    ]
+    selected = {}
+    for objective, winner in winners:
+        if winner.id not in selected:
+            selected[winner.id] = winner.model_copy(deep=True)
+        selected[winner.id].objectives.append(objective)
+    return list(selected.values())

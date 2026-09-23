@@ -15,7 +15,7 @@ from backend.app.services.simulation import evaluate
 from contracts.schemas import AISelection, AnalysisResponse, ScenarioRequest
 
 SELECTION = {
-    "strength_ids": ["gain_nura", "synergy_M10_M12"],
+    "strength_ids": ["contribution_M7", "contribution_M10"],
     "risk_ids": ["weakest_district", "lag_3"],
     "recommendation_ids": ["search_scope"],
 }
@@ -170,8 +170,8 @@ def test_overall_deadline_cancels_slow_provider(monkeypatch, scenario_data):
     provider_response({"strengths": ["Score 99.9"], "risks": ["Риск"], "recommendations": ["Совет"]}),
     provider_response({"strengths": [], "risks": ["Риск"], "recommendations": ["Совет"]}),
     provider_response({**SELECTION, "strength_ids": ["unknown_fact"]}),
-    provider_response({**SELECTION, "strength_ids": ["gain_nura", "gain_nura"]}),
-    provider_response({**SELECTION, "risk_ids": ["gain_nura"]}),
+    provider_response({**SELECTION, "strength_ids": ["contribution_M7", "contribution_M7"]}),
+    provider_response({**SELECTION, "risk_ids": ["contribution_M7"]}),
     provider_response({**SELECTION, "recommendation_ids": ["replace_M7_with_free_school"]}),
     provider_response({**SELECTION, "risk_ids": ["Лаг эффектов трёх мер социальной политики"]}),
 ])
@@ -257,3 +257,36 @@ def test_http_live_response_keeps_calculated_result(monkeypatch, scenario_data):
         assert parsed.alternatives
         assert "Проверено сервером" in parsed.analysis.recommendations[0]
         assert client.get("/api/health").json()["ai_mode"] == "live"
+
+
+@pytest.mark.parametrize("selected_risk", ["lag_3", "critical_nura_S1"])
+def test_provider_and_cache_cannot_hide_mandatory_risks_or_alternatives(monkeypatch, scenario_data, selected_risk):
+    from backend.app.services.advice import find_alternatives
+    request, catalog, _ = scenario_data
+    request.decisions[0].measure_id, request.decisions[0].district_id = "M8", "almaty"
+    request.decisions[1].measure_id, request.decisions[1].district_id = "M9", "esil"
+    expected = evaluate(request, catalog)
+    alternatives = find_alternatives(request, catalog)
+    evidence = build_evidence(expected, catalog, alternatives)
+
+    def handler(request):
+        return httpx.Response(200, json=provider_response({
+            "strength_ids": ["contribution_M8", "contribution_M9"],
+            "risk_ids": [selected_risk],
+            "recommendation_ids": [alternatives[0].id],
+        }))
+
+    clients = mock_provider(monkeypatch, handler)
+    monkeypatch.setattr(main, "AI_MODE", "live")
+    with TestClient(main.app) as client:
+        for source in ("provider", "cache"):
+            response = client.post("/api/simulations/analyze", json=request.model_dump())
+            assert response.status_code == 200
+            parsed = AnalysisResponse.model_validate(response.json())
+            assert (parsed.analysis.mode, parsed.analysis.source) == ("live", source)
+            assert parsed.result == expected
+            assert all(evidence.risks[key] in parsed.analysis.risks for key in evidence.mandatory_risk_ids)
+            assert len(parsed.analysis.risks) == len(set(parsed.analysis.risks))
+            assert parsed.analysis.recommendations == list(evidence.recommendations.values())
+            assert len(parsed.contributions) == 5
+    assert len(clients) == 1

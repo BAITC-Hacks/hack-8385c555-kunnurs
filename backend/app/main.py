@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from ai.agent import configured_mode, explain_scenario
 from backend.app.seed import ROOT, get_catalog
 from backend.app.services.advice import find_alternatives
-from backend.app.services.simulation import InvalidScenario, baseline, evaluate
+from backend.app.services.simulation import InvalidScenario, baseline, evaluate, leave_one_out
 from contracts.schemas import (
     AnalysisResponse, Catalog, ErrorBody, ErrorResponse, HealthResponse,
     ScenarioRequest, SimulationResult, ValidationIssue,
@@ -73,7 +73,8 @@ def analyze_scenario(request: ScenarioRequest) -> AnalysisResponse:
     source = get_catalog()
     result = evaluate(request, source)
     alternatives = find_alternatives(request, source)
+    contributions = leave_one_out(result, source)
     return AnalysisResponse(
-        result=result, alternatives=alternatives,
-        analysis=explain_scenario(result, source, mode=AI_MODE, alternatives=alternatives),
+        result=result, alternatives=alternatives, contributions=contributions,
+        analysis=explain_scenario(result, source, mode=AI_MODE, alternatives=alternatives, contributions=contributions),
     )
