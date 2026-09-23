@@ -1,6 +1,6 @@
 const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
-export async function api(path, { body, timeoutMs = 15000 } = {}) {
+export async function api(path, { body, timeoutMs = 35000 } = {}) {
   let response;
   try {
     response = await fetch(`${baseUrl}${path}`, {

@@ -8,8 +8,8 @@ const modeLabels = {
 };
 
 const sourceLabels = {
-  provider: 'Ответ модели',
-  cache: 'Проверенный ответ из кэша',
+  provider: 'AI · ответ модели',
+  cache: 'Кэш AI · сохранённый ответ модели',
   template: 'Шаблонное объяснение',
 };
 
@@ -18,7 +18,7 @@ export function AnalysisPanel({ result, analysis, alternatives, catalog, busy, o
   return <section id="analysis" className="panel analysis-panel" aria-labelledby="analysis-title" aria-live="polite">
     <div className="section-heading"><div><span className="section-kicker">03 / АНАЛИЗ</span><h2 id="analysis-title">Почему получился такой результат</h2>
       <p>AI объясняет рассчитанный сервером сценарий. Score и стоимость определяет только модель расчёта.</p></div></div>
-    {busy ? <div className="analysis-pending"><span className="spinner" aria-hidden="true" /><div><strong>Считаем сценарий и готовим объяснение…</strong><p>Ответ AI может занять до 12 секунд; при ошибке сервер вернёт явно обозначенный шаблон.</p></div></div>
+    {busy ? <div className="analysis-pending"><span className="spinner" aria-hidden="true" /><div><strong>Считаем сценарий и готовим объяснение…</strong><p>Ответ AI может занять до 30 секунд; при ошибке сервер вернёт явно обозначенный шаблон.</p></div></div>
       : analysis ? <>
         <div className="analysis-status"><span className={`ai-badge ai-badge--${mode}`}>{modeLabels[mode] || 'AI: режим неизвестен'}</span>
           <span className="analysis-source">{sourceLabels[analysis.source] || sourceLabels.template}</span>

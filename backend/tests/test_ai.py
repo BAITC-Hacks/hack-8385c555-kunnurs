@@ -75,6 +75,7 @@ def test_actual_sdk_parses_structured_response(monkeypatch, scenario_data):
     assert body["store"] is False
     assert body["text"]["format"]["type"] == "json_schema"
     assert body["text"]["format"]["strict"] is True
+    assert set(body["text"]["format"]["schema"]["properties"]["strength_ids"]["items"]["enum"]) == set(evidence.strengths)
     assert "tools" not in body
     payload = json.loads(body["input"][1]["content"])
     assert payload["result"]["score"] == result.score
