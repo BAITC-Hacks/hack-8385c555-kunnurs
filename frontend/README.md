@@ -1,0 +1,33 @@
+# Frontend «Аким на 5 часов»
+
+React/Vite интерфейс к API v1. Все суммы и ограничения для предварительной проверки берутся из `/api/catalog`; окончательное решение о допустимости набора и Score всегда возвращает backend.
+
+## Запуск
+
+Из корня полного проекта в PowerShell:
+
+```powershell
+Copy-Item frontend/.env.example frontend/.env.local
+npm.cmd --prefix frontend ci
+npm.cmd --prefix frontend run dev
+```
+
+Открыть `http://localhost:5173`. Если backend запущен на другом порту, изменить `VITE_API_URL` в `frontend/.env.local` и перезапустить Vite. Ключ OpenAI хранится только в корневом `.env` backend и не передаётся клиенту.
+
+## Проверка
+
+```powershell
+npm.cmd --prefix frontend test
+npm.cmd --prefix frontend run build
+```
+
+Тесты проверяют правила выбора на настоящем `data/city.json`: пример из задания, бюджет, повторы, направления, конфликты и районный масштаб. Сборка создаёт `frontend/dist/`.
+
+## Сценарий демо
+
+1. На старте показать исходный Score 52.56 и критические S1/S2 Нуры.
+2. Нажать «Рассчитать и получить AI-анализ» для набора из PDF: стоимость 95, Score 56.54, критических значений 0.
+3. Показать статус `analysis.mode` и `notice`. `live` означает ответ модели или кэш; `mock` и `fallback` явно обозначены как шаблон.
+4. Сохранить результат для сравнения, перенести M7 из Нуры в Есиль и рассчитать снова.
+
+Сравнение хранит один ответ сервера в `localStorage` браузера и сверяет `dataset_version`. Сохранения сценариев на backend пока нет.
