@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def pytest_addoption(parser):
     parser.addoption("--in-process", action="store_true", help="Use FastAPI TestClient; no listening server")
     parser.addoption("--expected-ai-mode", choices=("mock", "live", "fallback"))
+    parser.addoption("--require-api", action="store_true", help="Fail instead of skip if the remote API is unavailable")
 
 
 @pytest.fixture(scope="session")
@@ -45,6 +46,8 @@ def api(request):
         try:
             response = client.get("/api/health")
         except (httpx.ConnectError, httpx.TimeoutException):
+            if request.config.getoption("--require-api"):
+                pytest.fail("API unavailable; release checks require a reachable API")
             pytest.skip("API unavailable: start the server separately and set API_URL")
         assert response.status_code == 200, "API is reachable but health check failed"
         yield client

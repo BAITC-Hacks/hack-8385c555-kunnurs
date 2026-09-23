@@ -4,6 +4,7 @@ import { api } from './api';
 import './styles.css';
 
 const directions = { transport: 'Транспорт', ecology: 'Озеленение и экология', social: 'Социальная инфраструктура', safety: 'Безопасность', services: 'Городской сервис' };
+const aiModeLabels = { live: 'AI: live', mock: 'AI: шаблон (mock)', fallback: 'AI: шаблон (fallback)' };
 const demo = [
   { measure_id: 'M7', district_id: 'nura' },
   { measure_id: 'M8', district_id: 'nura' },
@@ -81,7 +82,7 @@ function App() {
         <div className="table-scroll"><table><thead><tr><th>Район</th><th>Баллы</th><th>Изменение</th></tr></thead><tbody>{result.districts.map((district) => <tr key={district.district_id}><td>{district.name}</td><td>{district.score.toFixed(2)}</td><td>{district.score_delta > 0 ? '+' : ''}{district.score_delta.toFixed(2)}</td></tr>)}</tbody></table></div>
         <p className="muted">Score = 0.7 × средний балл + 0.3 × балл слабейшего района − число показателей ниже 40.</p>
       </section>
-      {response && <section aria-live="polite"><h2>Объяснение результата</h2><p className="notice">{response.analysis.notice}</p><p>{response.analysis.summary}</p>
+      {response && <section aria-live="polite"><h2>Объяснение результата</h2><div className="analysis-status"><span className="ai-badge">{aiModeLabels[response.analysis.mode]}</span><p className="notice">{response.analysis.notice}</p></div><p>{response.analysis.summary}</p>
         {[['Сильные стороны', 'strengths'], ['Риски и компромиссы', 'risks'], ['Следующий шаг', 'recommendations']].map(([label, key]) => <div key={key}><h3>{label}</h3><ul>{response.analysis[key].map((text, index) => <li key={index}>{text}</li>)}</ul></div>)}
       </section>}
     </>}

@@ -122,4 +122,11 @@ def test_suggested_alternatives_reproduce_server_scores(api, scenario):
         result = checked(api.post(POST_PATHS[0], json=alternative.scenario.model_dump()), SimulationResult)
         assert result.score == pytest.approx(alternative.score, abs=1e-6)
         assert result.total_cost == alternative.total_cost <= 100
+        assert result.remaining_budget == alternative.remaining_budget
+        assert result.critical_count == alternative.critical_count
+        assert alternative.score_gain == pytest.approx(result.score - analysis.result.score, abs=1e-6)
+        original = {(decision["measure_id"], decision.get("district_id")) for decision in scenario["decisions"]}
+        changed = {(decision.measure_id, decision.district_id) for decision in alternative.scenario.decisions}
+        assert original - changed == {(alternative.removed.measure_id, alternative.removed.district_id)}
+        assert changed - original == {(alternative.added.measure_id, alternative.added.district_id)}
         assert result.score > analysis.result.score

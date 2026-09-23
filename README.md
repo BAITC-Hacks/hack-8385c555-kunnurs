@@ -8,27 +8,27 @@ AI-симулятор городских решений для HackAlem AI, тр
 
 ## Контейнер: запуск за 3 команды
 
-Требуется установленный и запущенный Docker с Linux Engine, Git и доступ к репозиторию. Выполнить из родительской папки, где ещё нет клона, после публикации OPS-изменений и интеграции в main:
+Требуются работающий Docker Desktop с Linux Engine и Compose, Git и доступ к репозиторию. До интеграции последнего OPS-коммита используйте `feat/ops`. Из папки, где ещё нет клона:
 
 ```powershell
-git clone https://github.com/BAITC-Hacks/hack-8385c555-kunnurs.git
-docker build -f hack-8385c555-kunnurs/deploy/Dockerfile -t akim-city:demo hack-8385c555-kunnurs
-docker run --rm --name akim-city -p 8000:8000 -e AI_MODE=mock akim-city:demo
+git clone --branch feat/ops https://github.com/BAITC-Hacks/hack-8385c555-kunnurs.git
+cd hack-8385c555-kunnurs
+docker compose -f deploy/compose.yaml up -d --build --wait --wait-timeout 90
 ```
 
-Открыть `http://localhost:8000`. Последняя команда работает в отдельном терминале человека, остановка Ctrl+C. Образ собирает frontend и отдаёт его вместе с API; ключ для mock не нужен. Сборка и работа контейнера проверены 23.09.2026. [Деплой, env и диагностика](deploy/README.md).
+Открыть **http://localhost:8000**. Команда завершается после готовности контейнера, приложение остаётся в Docker. Режим **mock** работает без ключа. Остановка: `docker compose -f deploy/compose.yaml down`. Если порт уже занят прежним `akim-demo`, остановить этот свой контейнер либо выбрать другой `AKIM_PORT` по [инструкции](deploy/README.md). Для **живого AI** используйте конфигурацию live и локальный `.env` из той же инструкции.
 
 ## Быстрый запуск
 
-Требуются Python 3.12+ и Node.js 22.12+; каркас проверен на Python 3.14.0 и Node.js 24.14.0 в Windows. Выполнять из корня клона командного репозитория.
+Требуются Python 3.12+ и Node.js 22.12+; OPS-проверки выполнены на Python 3.13.14 и Node.js 24.19.0 в Windows, контейнер — Python 3.12 / Node 22. Выполнять из корня клона.
 
 PowerShell:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-Copy-Item .env.example .env
-Copy-Item frontend/.env.example frontend/.env.local
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+if (-not (Test-Path frontend/.env.local)) { Copy-Item frontend/.env.example frontend/.env.local }
 npm.cmd --prefix frontend ci
 .\.venv\Scripts\python.exe scripts/check.py --require-frontend
 ```
@@ -57,9 +57,9 @@ Linux/macOS: создать окружение через `python3 -m venv .venv
 .\.venv\Scripts\python.exe scripts/check.py --require-frontend
 ```
 
-Альтернативы: `powershell -File scripts/check.ps1 --require-frontend` или `bash scripts/check.sh --require-frontend`. Проверка запускает pytest, проверяет импорт приложения и собирает frontend; серверы не запускаются. Без `--require-frontend` сборка пропускается, если зависимости frontend не установлены, и это явно выводится.
+Общая команда запускает основные тесты, OPS mock/fallback, импорт приложения и сборку frontend; серверы не запускаются и личный ключ в тестах не используется. Обёртки: `powershell -File deploy/check.ps1 -Python .venv/Scripts/python.exe` или `bash deploy/check.sh` с активным окружением. Если Windows запрещает `.ps1`, используйте прямую команду Python выше. Без `--require-frontend` сборка пропускается, если frontend-зависимости не установлены.
 
-OPS-проверки без слушающего сервера: `powershell -File deploy/check.ps1 -Python .venv/Scripts/python.exe`. Linux/macOS с активированным окружением: `bash deploy/check.sh`. Против уже запущенного API: задать `API_URL` и выполнить `python -m pytest tests/e2e -q -rs -p no:cacheprovider`. Недоступный API даёт SKIP, что не считается успешной проверкой релиза. После деплоя: `python deploy/smoke.py <HTTPS-URL> --require-https --expected-ai-mode mock`. [Подробности тестов](tests/e2e/README.md), [security-отчёт](docs/security-report.md).
+Полная проверка образа с автоматическим удалением временного контейнера: `python deploy/container_check.py --build --browser` (нужны зависимости Python, Node и Chromium/Edge). Против уже запущенного API: задать `API_URL`, выполнить `python -m pytest tests/e2e --require-api --expected-ai-mode mock -q -p no:cacheprovider`. Без `--require-api` недоступный API даёт SKIP. После публикации: `python deploy/smoke.py <HTTPS-URL> --require-https --expected-ai-mode live`; для первого свежего ответа добавить `--require-provider`. [Подробности](tests/e2e/README.md), [security-отчёт](docs/security-report.md).
 
 Ручное демо: начальный набор уже заполнен примером PDF. Нажать «Рассчитать сценарий»: стоимость 95, остаток 5, Score 56.54 (база 52.56), прирост +3.99. Перенести M7 из Нуры в Есиль и повторить — результат изменится. Попробовать дублирование меры или конфликт M4/M7 в одном районе — сервер вернёт объяснение ошибки. Набор дороже 100 блокируется и клиентом, и сервером.
 
@@ -68,14 +68,14 @@ OPS-проверки без слушающего сервера: `powershell -Fi
 ```text
 contracts/    схемы API, JSON-примеры, тесты контракта
 backend/      FastAPI, загрузка данных, чистый движок расчёта, тесты
-ai/           граница AI-адаптера, сейчас mock
+ai/           OpenAI, проверенные факты, кэш, mock/fallback
 frontend/     React + Vite, стартовый интерфейс
 data/         исходные синтетические районы и меры
 scripts/      проверки и обновление примеров
 .githooks/    проверка зон ответственности перед коммитом
 tests/e2e/    зона OPS для сквозных тестов
 deploy/       зона OPS для развёртывания
-docs/         архитектура и будущая эксплуатационная документация
+docs/         архитектура, результаты проверок, эксплуатация и питч
 ```
 
 Подробности: [SPEC.md](SPEC.md), [архитектура](docs/architecture.md), [API](contracts/api.md), [задачи команды](TASKS.md), [правила агентов](AGENTS.md), [использование AI](AI_USAGE.md).
@@ -86,7 +86,7 @@ Score считает Python по формуле датасета; LLM не оп�
 
 Данные вручную перенесены из предоставленных пользователем PDF «Датасет районов» и «HackAlem AI: Аким на 5 часов — AI-симулятор управления городом». Синтетические, без персональных данных; [подробности](data/README.md). Оригиналы PDF не включены. Предыдущие README и учебный Task-7 не используются.
 
-Каркас создан с помощью Codex; внешние шаблоны приложения и заимствованный код не использовались. Использованы библиотеки FastAPI, Pydantic, Uvicorn, python-dotenv, React, Vite; тесты — pytest и HTTPX. Версии Python-зависимостей закреплены в `requirements.txt`, frontend — в `package-lock.json`. Для разового чтения PDF использовался pypdf 6.19.0; приложению он не нужен. OpenAI SDK и SQLAlchemy будут добавлены при реализации соответствующих этапов.
+Каркас создан с помощью Codex; внешние шаблоны приложения и заимствованный код не использовались. Использованы FastAPI, Pydantic, Uvicorn, python-dotenv, OpenAI SDK, React, Vite; тесты — pytest и HTTPX. Версии Python-зависимостей закреплены в `requirements.txt`, frontend — в `package-lock.json`. Для разового чтения PDF LEAD использовал pypdf 6.19.0, OPS — встроенный Windows PDF API; приложению они не нужны. SQLAlchemy не используется.
 
 Официальные руководства: [FastAPI / тесты](https://fastapi.tiangolo.com/tutorial/testing/), [Pydantic / модели](https://docs.pydantic.dev/latest/concepts/models/), [Vite](https://vite.dev/guide/).
 

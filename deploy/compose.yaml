@@ -1,0 +1,27 @@
+name: akim-city
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "127.0.0.1:${AKIM_PORT:-8000}:8000"
+    environment:
+      AI_MODE: mock
+      PORT: "8000"
+      CORS_ORIGINS: ""
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

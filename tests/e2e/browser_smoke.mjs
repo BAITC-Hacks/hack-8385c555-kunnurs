@@ -8,6 +8,8 @@ import { basename, dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const origin = new URL(process.argv[2] || 'http://127.0.0.1:8000');
+const expectedMode = process.env.EXPECTED_AI_MODE || 'mock';
+assert(['mock', 'live', 'fallback'].includes(expectedMode), 'Set EXPECTED_AI_MODE to mock, live or fallback');
 assert(['http:', 'https:'].includes(origin.protocol), 'Use an HTTP(S) origin');
 assert(!origin.username && !origin.password && origin.pathname === '/' && !origin.search && !origin.hash);
 const executable = process.env.BROWSER_EXECUTABLE || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
@@ -20,11 +22,12 @@ const browser = spawn(executable, [
 let launchError;
 browser.on('error', (error) => { launchError = error; });
 let socket;
-const deadline = Date.now() + 45000;
+const deadline = Date.now() + 60000;
 const pending = new Map();
 let sequence = 0;
 const failures = [];
 const apiRequests = [];
+const analysisRequests = [];
 
 async function until(check, description) {
   while (Date.now() < deadline) {
@@ -76,30 +79,50 @@ try {
       else waiting.resolve(message.result);
     }
     if (message.method === 'Runtime.exceptionThrown') failures.push('Uncaught browser exception');
+    if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') failures.push('Browser console error');
     if (message.method === 'Network.loadingFailed' && !message.params.canceled) failures.push('Browser request failed');
     if (message.method === 'Network.requestWillBeSent' && message.params.type === 'Fetch') apiRequests.push(message.params.request.url);
     if (message.method === 'Network.responseReceived' && ['Fetch', 'Script', 'Stylesheet'].includes(message.params.type) && message.params.response.status >= 400) failures.push('API or asset HTTP error');
+    if (message.method === 'Network.responseReceived' && new URL(message.params.response.url).pathname === '/api/simulations/analyze') analysisRequests.push(message.params.requestId);
   });
   await command('Page.enable');
   await command('Runtime.enable');
   await command('Network.enable');
   await command('Page.navigate', { url: origin.href });
   await until(() => evaluate("document.querySelectorAll('.decision').length === 5 && document.body.innerText.includes('52.56')"), 'initial catalog and baseline');
-  await evaluate("document.querySelector('button').click()");
-  await until(() => evaluate("document.body.innerText.includes('56.54') && document.body.innerText.includes('+3.99') && !document.querySelector('button').disabled"), 'PDF scenario');
+  await evaluate("document.querySelector('form button').click()");
+  await until(() => evaluate("document.body.innerText.includes('56.54') && document.body.innerText.includes('+3.99') && !document.querySelector('form button').disabled"), 'PDF scenario');
   assert(await evaluate("document.querySelector('.notice')?.innerText.length > 0"), 'AI notice missing');
+  assert(await evaluate("document.querySelector('.ai-badge')?.innerText.length > 0"), 'AI mode badge missing');
   await evaluate(`(() => {
     const select = document.querySelector('.decision').querySelectorAll('select')[1];
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'esil');
     select.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
   await until(() => evaluate("document.querySelector('.decision').querySelectorAll('select')[1].value === 'esil' && !document.querySelector('.notice')"), 'district selection');
-  await evaluate("document.querySelector('button').click()");
-  await until(() => evaluate("document.body.innerText.includes('55.30') && !document.querySelector('button').disabled"), 'alternative scenario');
-  assert(apiRequests.length >= 5, 'Expected startup and analysis requests');
+  await evaluate("document.querySelector('form button').click()");
+  await until(() => evaluate("document.body.innerText.includes('55.30') && !document.querySelector('form button').disabled"), 'alternative scenario');
+  await evaluate(`(() => {
+    const select = document.querySelector('.decision').querySelectorAll('select')[1];
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'nura');
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await until(() => evaluate("document.querySelector('.decision').querySelectorAll('select')[1].value === 'nura' && !document.querySelector('.notice')"), 'restore district');
+  await evaluate("document.querySelector('form button').click()");
+  await until(() => evaluate("document.body.innerText.includes('56.54') && !document.querySelector('form button').disabled"), 'repeat PDF scenario');
+  const analyses = [];
+  for (const requestId of analysisRequests) {
+    const response = await command('Network.getResponseBody', { requestId });
+    const value = JSON.parse(response.base64Encoded ? Buffer.from(response.body, 'base64').toString() : response.body);
+    assert.equal(value.analysis.mode, expectedMode, 'Actual AI mode differs from EXPECTED_AI_MODE');
+    assert(['provider', 'cache', 'template'].includes(value.analysis.source), 'AI source missing');
+    analyses.push({ mode: value.analysis.mode, source: value.analysis.source, score: value.result.score });
+  }
+  assert.equal(analyses.length, 3, 'Expected three successful analyses');
+  assert(apiRequests.length >= 6, 'Expected startup and analysis requests');
   assert(apiRequests.every((url) => new URL(url).origin === origin.origin), 'Frontend called a different API origin');
   assert.deepEqual(failures, []);
-  console.log(JSON.stringify({ status: 'ok', browser: 'Chromium', baseline: '52.56', pdf: '56.54', schoolInEsil: '55.30', apiRequests: apiRequests.length, sameOrigin: true }));
+  console.log(JSON.stringify({ status: 'ok', browser: 'Chromium', baseline: '52.56', pdf: '56.54', schoolInEsil: '55.30', analyses, apiRequests: apiRequests.length, sameOrigin: true }));
 } finally {
   for (const waiting of pending.values()) clearTimeout(waiting.timer);
   socket?.close();
