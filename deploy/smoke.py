@@ -30,6 +30,7 @@ def main() -> int:
     parser.add_argument("url", help="Service origin, e.g. https://your-service.onrender.com")
     parser.add_argument("--require-https", action="store_true")
     parser.add_argument("--expected-ai-mode", choices=("mock", "live", "fallback"), default="mock")
+    parser.add_argument("--require-provider", action="store_true", help="Require a fresh live provider response, not cache")
     args = parser.parse_args()
     origin = args.url.rstrip("/")
     parts = urlsplit(origin)
@@ -85,14 +86,19 @@ def main() -> int:
             raise ValueError("Demo result does not match SPEC")
         if analysis["result"] != result or not analysis["analysis"]["notice"].strip():
             raise ValueError("AI response changed the calculation or omitted its notice")
-        if health["ai_mode"] != args.expected_ai_mode or analysis["analysis"]["mode"] != args.expected_ai_mode:
+        if analysis["analysis"]["mode"] != args.expected_ai_mode:
             raise ValueError("AI mode differs from the expected release mode")
+        if health["ai_mode"] != args.expected_ai_mode and not (health["ai_mode"] == "live" and args.expected_ai_mode == "fallback"):
+            raise ValueError("AI configuration differs from the expected release mode")
+        if args.require_provider and (analysis["analysis"]["mode"] != "live" or analysis["analysis"].get("source") != "provider" or analysis["analysis"].get("reason") is not None):
+            raise ValueError("Fresh live provider response required")
     except (HTTPError, URLError, OSError, ValueError, KeyError, TypeError):
         print("FAIL: release probe failed; check platform health, assets, SPEC values and AI mode.", file=sys.stderr)
         return 1
     print(json.dumps({"status": "ok", "checked_at": datetime.now(timezone.utc).isoformat(), "url": origin,
                       "dataset_version": result["dataset_version"], "score": result["score"],
-                      "ai_mode": analysis["analysis"]["mode"], "assets": len(assets.paths)}, ensure_ascii=False))
+                      "ai_mode": analysis["analysis"]["mode"], "ai_source": analysis["analysis"].get("source"),
+                      "ai_reason": analysis["analysis"].get("reason"), "assets": len(assets.paths)}, ensure_ascii=False))
     return 0
 
 

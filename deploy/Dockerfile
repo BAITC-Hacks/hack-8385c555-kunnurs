@@ -28,6 +28,7 @@ COPY data/city.json ./data/city.json
 COPY deploy/app.py deploy/healthcheck.py ./deploy/
 COPY --from=frontend-build /build/frontend/dist ./frontend/dist
 USER app
+RUN python -c "from deploy.app import create_app; create_app()"
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD ["python", "deploy/healthcheck.py"]

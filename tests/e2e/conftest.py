@@ -24,9 +24,15 @@ def api(request):
         import backend.app.main as main
 
         expected = request.config.getoption("--expected-ai-mode") or "mock"
-        # Current contract: live is a stub which returns explicit fallback.
+        if expected == "live":
+            pytest.fail("Use remote API_URL for live checks; in-process checks never use credentials")
         mode = "mock" if expected == "mock" else "live"
         with pytest.MonkeyPatch.context() as patch:
+            patch.setenv("OPENAI_API_KEY", "")
+            patch.setenv("OPENAI_MODEL", "unit-test-model")
+            patch.setenv("AI_TIMEOUT_SECONDS", "12")
+            patch.setenv("AI_REQUEST_TIMEOUT_SECONDS", "12")
+            patch.setenv("AI_CACHE_ENABLED", "false")
             patch.setattr(main, "AI_MODE", mode)
             with TestClient(main.app, raise_server_exceptions=False) as client:
                 yield client

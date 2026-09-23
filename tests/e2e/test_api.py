@@ -98,8 +98,28 @@ def test_ai_mode_is_explicit_and_does_not_change_score(api, scenario, request):
     evaluation = checked(api.post(POST_PATHS[0], json=scenario), SimulationResult)
     analysis = checked(api.post(POST_PATHS[1], json=scenario), AnalysisResponse)
     assert analysis.result == evaluation
-    assert analysis.analysis.mode == health.ai_mode
+    if health.ai_mode == "live":
+        assert analysis.analysis.mode in {"live", "fallback"}
+    else:
+        assert analysis.analysis.mode == health.ai_mode
+    if analysis.analysis.mode == "live":
+        assert analysis.analysis.source in {"provider", "cache"}
+        assert analysis.analysis.reason is None
+    else:
+        assert analysis.analysis.source == "template"
+        if analysis.analysis.mode == "fallback":
+            assert analysis.analysis.reason
     assert analysis.analysis.notice.strip()
     expected = request.config.getoption("--expected-ai-mode")
     if expected:
         assert analysis.analysis.mode == expected
+
+
+def test_suggested_alternatives_reproduce_server_scores(api, scenario):
+    analysis = checked(api.post(POST_PATHS[1], json=scenario), AnalysisResponse)
+    assert 1 <= len(analysis.alternatives) <= 3
+    for alternative in analysis.alternatives:
+        result = checked(api.post(POST_PATHS[0], json=alternative.scenario.model_dump()), SimulationResult)
+        assert result.score == pytest.approx(alternative.score, abs=1e-6)
+        assert result.total_cost == alternative.total_cost <= 100
+        assert result.score > analysis.result.score

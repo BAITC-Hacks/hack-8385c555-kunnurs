@@ -13,6 +13,17 @@ docker run --rm --name akim-city -p 8000:8000 -e AI_MODE=mock akim-city:ops
 
 Вторую команду держать в отдельном терминале. Открыть `http://localhost:8000`, Swagger — `/docs`, health — `/api/health`. Остановка: Ctrl+C. Локальная `.env` в образ не включается. Постоянный диск приложению не нужен.
 
+### Живой AI локально
+
+Сначала интегрировать актуальный `main` в ветку с файлами OPS и пересобрать образ. Создать корневой `.env` из `.env.example`, если его ещё нет; заполнить `OPENAI_API_KEY`, оставить `AI_MODE=live` и выбранную модель. Значение ключа не публиковать. Остановить прежний контейнер, занимающий порт 8000, затем:
+
+```powershell
+docker run -d --name akim-demo -p 127.0.0.1:8000:8000 --env-file .env -e AI_MODE=live akim-city:ops
+python deploy/smoke.py http://127.0.0.1:8000 --expected-ai-mode live --require-provider
+```
+
+Вторую команду выполнить до первого анализа в браузере: повторный сценарий может вернуться из кэша. `--require-provider` требует свежий ответ модели. Health проверяет конфигурацию, но не доступ модели/квоту. Если ключ изменился, контейнер нужно пересоздать с `--env-file`, обычный restart окружение не перечитает. Диагностика ответа: `analysis.mode`, `analysis.source`, `analysis.reason`.
+
 В другом терминале, если Python и зависимости доступны:
 
 ```powershell
@@ -33,12 +44,12 @@ python -m pytest tests/e2e -q -rs -p no:cacheprovider
 
 | Имя | Этап | Назначение |
 |---|---|---|
-| `AI_MODE` | Запуск | `mock` по умолчанию; сейчас `live` возвращает явный `fallback` |
+| `AI_MODE` | Запуск | В образе по умолчанию `mock`; для провайдера явно задать `live` |
 | `PORT` | Запуск | Порт платформы, иначе 8000; слушает `0.0.0.0` |
 | `CORS_ORIGINS` | Запуск | Пустое значение для единого origin; при отдельном frontend — точный HTTPS origin без `*` |
 | `VITE_API_URL` | Сборка | В Dockerfile `/`, запросы на текущий origin. Пустое значение в текущем frontend включает localhost |
 | `FRONTEND_DIST` | Запуск | Необязательный путь статики, по умолчанию `/app/frontend/dist` |
-| `OPENAI_API_KEY` | Запуск | Только секрет платформы после live-интеграции LEAD; никогда build arg или `VITE_*` |
+| `OPENAI_API_KEY` | Запуск | Секрет платформы или локальный `--env-file .env`; никогда build arg или `VITE_*` |
 | `OPENAI_MODEL` | Запуск | Будет использован после реализации провайдера; модель согласует LEAD |
 
 `DATABASE_URL` текущему приложению не нужен. Ключ сам по себе не включает LLM.
@@ -86,7 +97,7 @@ python -m pytest tests/e2e -q -rs -p no:cacheprovider
 | Запросы к localhost | Пересобрать образ с `VITE_API_URL=/`; runtime env не изменяет готовый JS |
 | 502 / failed health | Проверить `0.0.0.0:$PORT`, start command, каталог данных |
 | 422 | Прочитать `error.issues`, сверить IDs/бюджет/конфликты |
-| Live даёт fallback | Провайдер пока не реализован; BLOCKER LEAD |
+| Live даёт fallback | Проверить `analysis.reason`: missing_api_key — передать ключ; authentication_error — заменить ключ; permission_error — доступ модели; rate_limit — квота/лимиты; timeout/connection_error — сеть; invalid_configuration — настройки |
 | Free-сервис долго открывается | Дождаться холодного старта, повторить smoke, проверить лимиты |
 
 Восстановление и график: [runbook.md](../docs/runbook.md).

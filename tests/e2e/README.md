@@ -20,7 +20,7 @@ python -m pytest tests/e2e --in-process --expected-ai-mode mock -q -p no:cachepr
 python -m pytest tests/e2e/test_api.py --in-process --expected-ai-mode fallback -q -p no:cacheprovider
 ```
 
-`--in-process` явно включает FastAPI TestClient. Он проверяет обработку HTTP внутри Python-процесса, не проверяя сеть, TLS или хостинг. Второй запуск проверяет текущий `AI_MODE=live`, который по контракту возвращает fallback. После реализации настоящего LLM эта проверка должна быть согласована с LEAD и моделировать отказ провайдера без реального платного вызова.
+`--in-process` явно включает FastAPI TestClient. Он проверяет обработку HTTP внутри Python-процесса, не проверяя сеть, TLS или хостинг. Личный ключ заменяется пустым: второй запуск проверяет `AI_MODE=live` без ключа и явный fallback. Для настоящего live нужен отдельно запущенный API и режим без `--in-process`; такой прогон может обращаться к платному провайдеру. Health показывает конфигурацию, фактический режим проверяется в ответе анализа. Предложенные альтернативы повторно рассчитываются через `/evaluate`.
 
 Полный конечный прогон: `powershell -File deploy/check.ps1 -Python .venv/Scripts/python.exe` либо `bash deploy/check.sh` с активированным окружением. Включает обязательный `scripts/check.py --require-frontend`, OPS mock и fallback проверки; ничего не устанавливает и не запускает серверы.
 
