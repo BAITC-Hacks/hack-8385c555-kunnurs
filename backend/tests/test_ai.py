@@ -7,16 +7,17 @@ from openai import AsyncOpenAI
 import pytest
 
 from ai import agent, cache
+from ai.evidence import build_evidence
 from ai.privacy import redact
 from backend.app import main
 from backend.app.seed import ROOT, get_catalog
 from backend.app.services.simulation import evaluate
-from contracts.schemas import AINarrative, AnalysisResponse, ScenarioRequest
+from contracts.schemas import AISelection, AnalysisResponse, ScenarioRequest
 
-NARRATIVE = {
-    "strengths": ["Школа и поликлиника поддерживают социальную сферу Нуры.", "Камеры усиливаются совместной работой с платформой обращений."],
-    "risks": ["Лаг ограничивает реализованный эффект инфраструктуры.", "Это синтетическая модель, а не прогноз для реального города."],
-    "recommendations": ["Сравните альтернативную замену меры в симуляторе, учитывая слабейший район."],
+SELECTION = {
+    "strength_ids": ["gain_nura", "synergy_M10_M12"],
+    "risk_ids": ["weakest_district", "lag_3"],
+    "recommendation_ids": ["search_scope"],
 }
 
 
@@ -28,7 +29,7 @@ def scenario_data():
 
 
 def provider_response(narrative=None, *, status="completed", refusal=False):
-    content = [{"type": "refusal", "refusal": "Cannot comply"}] if refusal else [{"type": "output_text", "text": json.dumps(narrative or NARRATIVE, ensure_ascii=False), "annotations": []}]
+    content = [{"type": "refusal", "refusal": "Cannot comply"}] if refusal else [{"type": "output_text", "text": json.dumps(narrative or SELECTION, ensure_ascii=False), "annotations": []}]
     return {
         "id": "resp_test", "object": "response", "created_at": 1,
         "status": status, "model": "unit-test-model", "error": None,
@@ -64,7 +65,8 @@ def test_actual_sdk_parses_structured_response(monkeypatch, scenario_data):
     answer = agent.explain_scenario(result, catalog, mode="live")
     assert answer.mode == "live"
     assert answer.source == "provider"
-    assert answer.strengths == NARRATIVE["strengths"]
+    evidence = build_evidence(result, catalog)
+    assert answer.strengths == [evidence.strengths[key] for key in SELECTION["strength_ids"]]
     assert "56.54" in answer.summary
     assert result.model_dump() == before
     assert clients[0]["max_retries"] == 1
@@ -77,6 +79,7 @@ def test_actual_sdk_parses_structured_response(monkeypatch, scenario_data):
     payload = json.loads(body["input"][1]["content"])
     assert payload["result"]["score"] == result.score
     assert len(payload["selected_measures"]) == 5
+    assert payload["evidence"] == evidence.model_dump()
 
 
 def test_cache_reuses_only_identical_context(monkeypatch, scenario_data):
@@ -166,6 +169,11 @@ def test_overall_deadline_cancels_slow_provider(monkeypatch, scenario_data):
     provider_response(status="incomplete"),
     provider_response({"strengths": ["Score 99.9"], "risks": ["Риск"], "recommendations": ["Совет"]}),
     provider_response({"strengths": [], "risks": ["Риск"], "recommendations": ["Совет"]}),
+    provider_response({**SELECTION, "strength_ids": ["unknown_fact"]}),
+    provider_response({**SELECTION, "strength_ids": ["gain_nura", "gain_nura"]}),
+    provider_response({**SELECTION, "risk_ids": ["gain_nura"]}),
+    provider_response({**SELECTION, "recommendation_ids": ["replace_M7_with_free_school"]}),
+    provider_response({**SELECTION, "risk_ids": ["Лаг эффектов трёх мер социальной политики"]}),
 ])
 def test_refusal_incomplete_and_untrusted_output(monkeypatch, scenario_data, response):
     _, catalog, result = scenario_data
@@ -223,7 +231,7 @@ def test_cache_expiry_and_capacity(monkeypatch):
     clock = [0]
     monkeypatch.setattr(cache, "monotonic", lambda: clock[0])
     monkeypatch.setattr(cache, "MAX_ENTRIES", 2)
-    narrative = AINarrative(**NARRATIVE)
+    narrative = AISelection(**SELECTION)
     for key in ("a", "b", "c"):
         cache.put(key, narrative)
     assert cache.get("a") is None
@@ -235,10 +243,17 @@ def test_cache_expiry_and_capacity(monkeypatch):
 def test_http_live_response_keeps_calculated_result(monkeypatch, scenario_data):
     scenario, _, expected = scenario_data
     monkeypatch.setattr(main, "AI_MODE", "live")
-    mock_provider(monkeypatch, lambda request: httpx.Response(200, json=provider_response()))
+    def handler(request):
+        evidence = json.loads(json.loads(request.content)["input"][1]["content"])["evidence"]
+        selection = {**SELECTION, "recommendation_ids": [next(iter(evidence["recommendations"]))]}
+        return httpx.Response(200, json=provider_response(selection))
+
+    mock_provider(monkeypatch, handler)
     with TestClient(main.app) as client:
         response = client.post("/api/simulations/analyze", json=scenario.model_dump())
         parsed = AnalysisResponse.model_validate(response.json())
         assert parsed.analysis.mode == "live"
         assert parsed.result == expected
+        assert parsed.alternatives
+        assert "Проверено сервером" in parsed.analysis.recommendations[0]
         assert client.get("/api/health").json()["ai_mode"] == "live"

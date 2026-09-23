@@ -4,15 +4,15 @@ from collections import OrderedDict
 from threading import Lock
 from time import monotonic
 
-from contracts.schemas import AINarrative
+from contracts.schemas import AISelection
 
 MAX_ENTRIES = 128
 TTL_SECONDS = 3600
-_entries: OrderedDict[str, tuple[float, AINarrative]] = OrderedDict()
+_entries: OrderedDict[str, tuple[float, AISelection]] = OrderedDict()
 _lock = Lock()
 
 
-def get(key: str) -> AINarrative | None:
+def get(key: str) -> AISelection | None:
     with _lock:
         item = _entries.get(key)
         if item is None:
@@ -25,7 +25,7 @@ def get(key: str) -> AINarrative | None:
         return narrative.model_copy(deep=True)
 
 
-def put(key: str, narrative: AINarrative) -> None:
+def put(key: str, narrative: AISelection) -> None:
     with _lock:
         _entries[key] = (monotonic(), narrative.model_copy(deep=True))
         _entries.move_to_end(key)

@@ -162,6 +162,21 @@ class SimulationResult(Contract):
     applied_synergies: list[AppliedSynergy]
 
 
+class ScenarioAlternative(Contract):
+    """One independent, valid replacement; never apply several together blindly."""
+
+    id: str
+    removed: Decision
+    added: Decision
+    scenario: ScenarioRequest
+    score: float
+    score_gain: float
+    total_cost: int
+    remaining_budget: int
+    critical_count: int
+    tradeoffs: list[str]
+
+
 class Analysis(Contract):
     mode: Literal["mock", "live", "fallback"]
     summary: str
@@ -174,16 +189,31 @@ class Analysis(Contract):
 
 
 class AINarrative(Contract):
-    """Provider-only schema: numeric summary and score never come from the LLM."""
+    """Rendered, server-owned evidence text, not a provider generation schema."""
 
-    strengths: list[Annotated[str, Field(min_length=1, max_length=450)]] = Field(min_length=1, max_length=4)
-    risks: list[Annotated[str, Field(min_length=1, max_length=450)]] = Field(min_length=1, max_length=4)
-    recommendations: list[Annotated[str, Field(min_length=1, max_length=450)]] = Field(min_length=1, max_length=4)
+    strengths: list[str]
+    risks: list[str]
+    recommendations: list[str]
+
+
+class AISelection(Contract):
+    """The LLM ranks existing evidence IDs; it cannot invent displayed claims."""
+
+    strength_ids: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(min_length=1, max_length=3)
+    risk_ids: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(min_length=1, max_length=3)
+    recommendation_ids: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(min_length=1, max_length=2)
+
+
+class AnalysisEvidence(Contract):
+    strengths: dict[str, str]
+    risks: dict[str, str]
+    recommendations: dict[str, str]
 
 
 class AnalysisResponse(Contract):
     result: SimulationResult
     analysis: Analysis
+    alternatives: list[ScenarioAlternative] = Field(default_factory=list)
 
 
 class HealthResponse(Contract):
