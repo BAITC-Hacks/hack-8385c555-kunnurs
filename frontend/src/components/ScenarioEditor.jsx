@@ -1,5 +1,6 @@
 import React from 'react';
 import { DIRECTIONS } from '../scenario';
+import { Localized } from '../i18n';
 
 function effectText(effects) {
   return Object.entries(effects).map(([metric, value]) => `${metric} ${value > 0 ? '+' : ''}${value}`).join(' · ');
@@ -10,7 +11,7 @@ export function ScenarioEditor({ catalog, decisions, preview, busy, onChange, on
   const selectedCount = decisions.filter(({ measure_id }) => measure_id).length;
   const budgetPercent = Math.min(100, (preview.totalCost / rules.budget) * 100);
 
-  return <section id="scenario" className="panel scenario-panel" aria-labelledby="scenario-title">
+  return <Localized><section id="scenario" className="panel scenario-panel" aria-labelledby="scenario-title">
     <div className="section-heading">
       <div><span className="section-kicker">01 / РЕШЕНИЯ</span><h2 id="scenario-title">Соберите свой сценарий</h2>
         <p>Пять разных мер, минимум три направления, бюджет до {rules.budget} единиц. Районные меры действуют в одном районе, городские — во всех пяти.</p></div>
@@ -81,5 +82,5 @@ export function ScenarioEditor({ catalog, decisions, preview, busy, onChange, on
           <span>Все вычисления Score выполняет backend.</span></div>
       </fieldset>
     </form>
-  </section>;
+  </section></Localized>;
 }

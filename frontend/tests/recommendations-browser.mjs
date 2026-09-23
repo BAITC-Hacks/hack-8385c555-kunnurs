@@ -2,7 +2,7 @@
 // interception and calls FastAPI TestClient in mock mode: no server or paid AI.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +21,6 @@ const browser = spawn(executable, [
 ], { windowsHide: true, stdio: 'ignore' });
 let launchError, socket, lastAnalysis;
 browser.on('error', (error) => { launchError = error; });
-const deadline = Date.now() + 55000;
 const pending = new Map();
 const failures = [];
 const submissions = [];
@@ -29,6 +28,7 @@ let sequence = 0;
 let failNext = false;
 
 async function until(check, description) {
+  const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
     if (launchError) throw launchError;
     if (failures.length) throw new Error(failures.join('; '));
@@ -174,10 +174,45 @@ try {
   assert.deepEqual(submissions.at(-1), failedDraft, 'retry must calculate the applied draft');
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   assert(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'mobile horizontal overflow');
+  const beforeLanguage = await evaluate("Array.from(document.querySelectorAll('.decision-card select'), s => s.value)");
+  const originalNarrative = await evaluate("Array.from(document.querySelectorAll('[data-original-text]'), el => el.textContent)");
+  const requestsBeforeLanguage = submissions.length;
+  for (const [locale, heading] of [['en', 'Build your scenario'], ['kk', 'Өз сценарийіңізді құрыңыз'], ['ru', 'Соберите свой сценарий']]) {
+    await evaluate(`document.querySelector('[data-language=${locale}]').click()`);
+    await until(() => evaluate(`document.documentElement.lang === '${locale}' && document.querySelector('#scenario-title').textContent === ${JSON.stringify(heading)}`), `language ${locale}`);
+    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('.decision-card select'), s => s.value)"), beforeLanguage, 'language must preserve the draft');
+    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('[data-original-text]'), el => el.textContent)"), originalNarrative, 'server narratives must remain verbatim');
+    assert.equal(submissions.length, requestsBeforeLanguage, 'language must not recalculate');
+    assert(await evaluate("document.querySelector('.language-switcher').getBoundingClientRect().right <= innerWidth"), 'language control fits mobile screen');
+    assert(await evaluate("document.querySelector('.topbar nav').scrollWidth <= document.querySelector('.topbar nav').clientWidth"), 'all navigation labels fit mobile screen');
+    if (locale === 'en') {
+      const untranslated = await evaluate(`(() => {
+        const walker = document.createTreeWalker(document.querySelector('.site-shell'), NodeFilter.SHOW_TEXT);
+        const missed = []; let node;
+        while ((node = walker.nextNode())) if (/[А-Яа-яЁё]/.test(node.textContent) && !node.parentElement.closest('[data-original-text], .language-switcher')) missed.push(node.textContent);
+        return missed;
+      })()`);
+      assert.deepEqual(untranslated, [], 'all interface copy is translated into English');
+    }
+  }
   await select(0, 1, 'esil');
   assert.equal(await evaluate("document.querySelectorAll('.alternative-card').length"), 0, 'editing invalidates advice');
+  await evaluate("document.querySelector('[data-language=kk]').focus()");
+  assert.equal(await evaluate('document.activeElement.dataset.language'), 'kk');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', unmodifiedText: '\r', windowsVirtualKeyCode: 13 });
+  await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await until(() => evaluate("document.documentElement.lang === 'kk'"), 'keyboard language selection');
+  await command('Page.reload');
+  await until(() => evaluate("document.documentElement.lang === 'kk' && document.querySelectorAll('.decision-card').length === 5"), 'language persists across reload');
+  await evaluate("document.querySelector('#scenario .heading-actions button:last-child').click()");
+  await until(() => evaluate("document.querySelector('.validation-area').textContent.includes('Дәл 5 шара таңдаңыз.')"), 'Kazakh validation message');
+  if (process.env.UI_SCREENSHOT_PATH) {
+    await evaluate('window.scrollTo(0, 0)');
+    const shot = await command('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(process.env.UI_SCREENSHOT_PATH, Buffer.from(shot.data, 'base64'));
+  }
   assert.deepEqual(failures, []);
-  console.log(JSON.stringify({ status: 'ok', verifiedReplacements: choices.length, mandatoryRisks: true, applyAndRecalculate: true, comparison: true, duplicateClick: 'blocked', retry: true, mobile: true, provider: 'mock', listeningServer: false }));
+  console.log(JSON.stringify({ status: 'ok', verifiedReplacements: choices.length, mandatoryRisks: true, applyAndRecalculate: true, comparison: true, duplicateClick: 'blocked', retry: true, mobile: true, languages: ['ru', 'kk', 'en'], languagePersistence: true, keyboard: true, provider: 'mock', listeningServer: false }));
 } finally {
   for (const waiting of pending.values()) clearTimeout(waiting.timer);
   socket?.close();

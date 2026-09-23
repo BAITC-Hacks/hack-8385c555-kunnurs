@@ -7,6 +7,7 @@ import { DistrictResults } from './components/DistrictResults';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { ComparePanel } from './components/ComparePanel';
 import './styles.css';
+import { LanguageProvider, LanguageSwitcher, Localized } from './i18n';
 
 const STORAGE_KEY = 'akim-saved-scenario-v1';
 const score = (value) => Number(value).toFixed(2);
@@ -129,10 +130,10 @@ function App() {
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* Storage may be disabled. */ }
   }
 
-  return <div className="site-shell">
+  return <Localized><div className="site-shell">
     <header className="topbar"><a className="brand" href="#top" aria-label="Аким на 5 часов, наверх"><span className="brand-mark" aria-hidden="true">5</span><span>АКИМ <b>НА 5 ЧАСОВ</b></span></a>
       <nav aria-label="Разделы страницы"><a href="#scenario">Решения</a><a href="#districts">Районы</a><a href="#analysis">AI-анализ</a><a href="#compare">Сравнение</a></nav>
-      <span className={loadError ? 'connection connection--error' : 'connection'}><i aria-hidden="true" />{loadError ? 'API недоступен' : loading ? 'Подключаем API' : 'API подключён'}</span>
+      <div className="topbar-tools"><span className={loadError ? 'connection connection--error' : 'connection'}><i aria-hidden="true" />{loadError ? 'API недоступен' : loading ? 'Подключаем API' : 'API подключён'}</span><LanguageSwitcher /></div>
     </header>
 
     <main id="top">
@@ -184,7 +185,7 @@ function App() {
       </>}
     </main>
     <footer className="footer"><div><strong>Аким на 5 часов</strong><p>Проверяйте решения на данных, а не на догадках.</p></div><p>Синтетический датасет · Score считает сервер · AI не меняет выбранные меры</p></footer>
-  </div>;
+  </div></Localized>;
 }
 
-createRoot(document.getElementById('root')).render(<React.StrictMode><App /></React.StrictMode>);
+createRoot(document.getElementById('root')).render(<React.StrictMode><LanguageProvider><App /></LanguageProvider></React.StrictMode>);

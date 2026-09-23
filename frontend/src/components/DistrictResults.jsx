@@ -1,5 +1,6 @@
 import React from 'react';
 import { METRICS } from '../scenario';
+import { Localized } from '../i18n';
 
 const number = (value) => Number(value).toFixed(2);
 const signed = (value) => `${value > 0 ? '+' : ''}${number(value)}`;
@@ -10,7 +11,7 @@ export function DistrictResults({ catalog, baseline, result, selectedDistrict, o
   const criticalCount = (districtId, source) => source.critical_indicators.filter(({ district_id }) => district_id === districtId).length;
   const districtName = (id) => catalog.districts.find(({ id: districtId }) => districtId === id)?.name || id;
 
-  return <section id="districts" className="panel" aria-labelledby="districts-title">
+  return <Localized><section id="districts" className="panel" aria-labelledby="districts-title">
     <div className="section-heading"><div><span className="section-kicker">02 / ПОКАЗАТЕЛИ</span><h2 id="districts-title">Что изменилось в районах</h2>
       <p>Один исходный набор для всех сценариев. Нажмите на район, чтобы увидеть все десять показателей.</p></div>
       <span className="legend"><i className="legend-dot" /> значение ниже {catalog.rules.critical_threshold} — критическое</span>
@@ -76,5 +77,5 @@ export function DistrictResults({ catalog, baseline, result, selectedDistrict, o
         <small>Показанные эффекты даны до ограничения 0–100. Они не складываются напрямую в Score.</small>
       </div>
     </div>}
-  </section>;
+  </section></Localized>;
 }
