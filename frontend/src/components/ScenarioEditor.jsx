@@ -42,7 +42,7 @@ export function ScenarioEditor({ catalog, decisions, preview, busy, onChange, on
         <div className="decision-list">{decisions.map((decision, index) => {
           const measure = catalog.measures.find(({ id }) => id === decision.measure_id);
           const invalid = preview.issues.some(({ slots }) => slots.includes(index));
-          return <div className={invalid ? 'decision-card decision-card--error' : 'decision-card'} key={index}>
+          return <div className={invalid ? 'decision-card decision-card--error' : measure ? 'decision-card decision-card--selected' : 'decision-card'} key={index}>
             <span className="decision-number">{String(index + 1).padStart(2, '0')}</span>
             <div className="decision-fields">
               <label htmlFor={`measure-${index}`}>Мероприятие</label>
@@ -57,7 +57,7 @@ export function ScenarioEditor({ catalog, decisions, preview, busy, onChange, on
                   )}</optgroup>
                 )}
               </select>
-              {measure && <span className="decision-effect">{effectText(measure.effects)} <span>до учёта лага</span></span>}
+              {measure && <div className="decision-details"><span className="decision-category">{DIRECTIONS[measure.direction]}</span><span className="decision-effect">{effectText(measure.effects)} <span>до учёта лага</span></span></div>}
             </div>
             <div className="decision-district">
               <label htmlFor={`district-${index}`}>Район</label>

@@ -37,6 +37,17 @@ export function DistrictResults({ catalog, baseline, result, selectedDistrict, o
     <div className="district-detail">
       <div className="detail-heading"><div><span className="section-kicker">РАЙОН КРУПНЫМ ПЛАНОМ</span><h3>{district.name}</h3></div>
         <p>Балл: <b>{number(initial.score)}</b> <span aria-hidden="true">→</span> <b>{number(district.score)}</b></p></div>
+      <div className="indicator-profile" aria-hidden="true">
+        <div className="indicator-profile__heading"><strong>Профиль показателей</strong><div><span className="profile-key profile-key--before" /> До <span className="profile-key profile-key--after" /> После</div></div>
+        <div className="indicator-profile__scroll"><div className="indicator-profile__plot">
+          <span className="indicator-profile__threshold" style={{ bottom: `${21 + 1.26 * catalog.rules.critical_threshold}px` }} />
+          {METRICS.map(([code, label]) => <div className="indicator-profile__item" key={code} title={`${label}: ${number(initial.indicators[code])} → ${number(district.indicators[code])}`}>
+            <span className="indicator-profile__bars"><i style={{ height: `${initial.indicators[code]}%` }} /><b className={district.indicators[code] < catalog.rules.critical_threshold ? 'is-critical' : ''} style={{ height: `${district.indicators[code]}%` }} /></span>
+            <span>{code}</span>
+          </div>)}
+        </div></div>
+        <small>Пунктир — порог критического значения {catalog.rules.critical_threshold}</small>
+      </div>
       <div className="table-scroll"><table className="metrics-table"><caption>Показатели района {district.name}: исходные и после решений</caption>
         <thead><tr><th scope="col">Показатель</th><th scope="col">До</th><th scope="col">После</th><th scope="col">Изменение</th><th scope="col">Состояние</th></tr></thead>
         <tbody>{METRICS.map(([code, label]) => {

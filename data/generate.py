@@ -14,6 +14,10 @@ SEED = 8385
 
 
 def generate(count: int = 5, seed: int = SEED) -> list[dict]:
+    if type(count) is not int or not 1 <= count <= 100:
+        raise ValueError("count must be an integer from 1 to 100")
+    if type(seed) is not int:
+        raise ValueError("seed must be an integer")
     catalog = json.loads((ROOT / "data/city.json").read_text(encoding="utf-8"))
     rng = random.Random(seed)
     measures = sorted(catalog["measures"], key=lambda measure: measure["id"])

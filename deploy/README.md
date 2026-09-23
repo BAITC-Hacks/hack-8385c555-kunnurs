@@ -1,38 +1,61 @@
 # Сборка и публикация
 
-Один Docker-образ: Node собирает React/Vite, Python запускает FastAPI API и статику через `deploy.app:create_app`. Образ собран и проверен локально 23.09.2026: health, smoke, 79 pytest-проверок и браузерное демо успешны. Публичный URL пока не получен. Фактический статус — [deployment-status.md](../docs/deployment-status.md).
+Один Docker-образ: Node собирает React/Vite, Python запускает FastAPI API и статику через `deploy.app:create_app`. Ветка OPS включает live AI из main. Публичный URL пока не получен. Ревизии и результаты проверок — [deployment-status.md](../docs/deployment-status.md).
 
 ## Локальный контейнер
 
-Docker Desktop должен работать в режиме Linux containers. Команды выполняет человек из корня репозитория:
+Docker Desktop должен работать в режиме Linux containers. Основной способ из корня репозитория:
 
 ```powershell
-docker build -f deploy/Dockerfile -t akim-city:ops .
-docker run --rm --name akim-city -p 8000:8000 -e AI_MODE=mock akim-city:ops
+docker compose -f deploy/compose.yaml up -d --build --wait --wait-timeout 90
 ```
 
-Вторую команду держать в отдельном терминале. Открыть `http://localhost:8000`, Swagger — `/docs`, health — `/api/health`. Остановка: Ctrl+C. Локальная `.env` в образ не включается. Постоянный диск приложению не нужен.
+Открыть `http://localhost:8000`, Swagger — `/docs`, health — `/api/health`. Эта конфигурация явно включает mock и не передаёт `.env` в контейнер. Повтор команды обновляет изменённый образ. Состояние: `docker compose -f deploy/compose.yaml ps`; остановка: `docker compose -f deploy/compose.yaml down`.
+
+Если порт занят, в PowerShell задать `$env:AKIM_PORT = '8002'`, повторить команду и открыть `http://localhost:8002`. Linux/macOS: `AKIM_PORT=8002 docker compose -f deploy/compose.yaml up -d --build --wait`. Compose создаёт отдельный проект `akim-city`; он не управляет старым контейнером `akim-demo`.
+
+Compose ограничивает прослушивание localhost, запускает процесс от UID 10001 с read-only файловой системой и временной `/tmp`, без Linux capabilities и повышения привилегий. Логи ограничены двумя файлами по 5 MB. Постоянный диск MVP не нужен. Формат: [Docker Compose services](https://docs.docker.com/reference/compose-file/services/).
 
 ### Живой AI локально
 
-Сначала интегрировать актуальный `main` в ветку с файлами OPS и пересобрать образ. Создать корневой `.env` из `.env.example`, если его ещё нет; заполнить `OPENAI_API_KEY`, оставить `AI_MODE=live` и выбранную модель. Значение ключа не публиковать. Остановить прежний контейнер, занимающий порт 8000, затем:
+Создать корневой `.env` из `.env.example`, если его ещё нет; заполнить `OPENAI_API_KEY`, оставить `AI_MODE=live` и `OPENAI_MODEL=gpt-4.1-mini` либо модель, согласованную с LEAD. Не перезаписывать существующий файл. Затем:
 
 ```powershell
-docker run -d --name akim-demo -p 127.0.0.1:8000:8000 --env-file .env -e AI_MODE=live akim-city:ops
+docker compose -f deploy/compose.yaml -f deploy/compose.live.yaml up -d --build --force-recreate --wait --wait-timeout 90
 python deploy/smoke.py http://127.0.0.1:8000 --expected-ai-mode live --require-provider
 ```
 
-Вторую команду выполнить до первого анализа в браузере: повторный сценарий может вернуться из кэша. `--require-provider` требует свежий ответ модели. Health проверяет конфигурацию, но не доступ модели/квоту. Если ключ изменился, контейнер нужно пересоздать с `--env-file`, обычный restart окружение не перечитает. Диагностика ответа: `analysis.mode`, `analysis.source`, `analysis.reason`.
+Вторую команду выполнить до первого анализа в браузере: повторный сценарий может вернуться из кэша. `--require-provider` требует свежий ответ модели; обычная проверка live принимает и `source=cache`. Health проверяет конфигурацию, но не доступ модели/квоту. После изменения ключа повторить команду с `--force-recreate`: обычный restart окружение не перечитывает. Без ключа будет `fallback / missing_api_key`. Compose live читает `.env` только при запуске; файл не включается в образ.
+
+В этой локальной конфигурации внутренний `PORT=8000` и пустой `CORS_ORIGINS` заданы явно; внешний порт выбирается `AKIM_PORT`. Не выводить результат `docker compose ... config` с live-секретами; для проверки формата используйте `config --quiet`.
+
+### Сборка без Compose
+
+```powershell
+docker build -f deploy/Dockerfile -t akim-city:ops .
+docker run --rm --name akim-city -p 127.0.0.1:8000:8000 -e AI_MODE=mock akim-city:ops
+```
+
+Последняя команда остаётся в терминале до Ctrl+C. Для live передать `--env-file .env -e AI_MODE=live`. После изменения `.env` остановить старый контейнер и создать новый. Не запускать одновременно два контейнера на одном порту.
 
 В другом терминале, если Python и зависимости доступны:
 
 ```powershell
 python deploy/smoke.py http://127.0.0.1:8000 --expected-ai-mode mock
 $env:API_URL = 'http://127.0.0.1:8000'
-python -m pytest tests/e2e -q -rs -p no:cacheprovider
+python -m pytest tests/e2e --require-api --expected-ai-mode mock -q -p no:cacheprovider
 ```
 
-`smoke.py` использует стандартную библиотеку. Проверяет HTML, JS/CSS, пять API, контрольные числа и режим AI; недоступность означает ненулевой exit code. Это конечная проверка, не мониторинг и не браузерный тест.
+`smoke.py` использует стандартную библиотеку. Проверяет HTML, JS/CSS, пять API, базу 52.55768, пример 56.54307, школу в Есиле 55.29777, пересчитывает альтернативы, проверяет 422 и закрытые `.env`/`.git`. Недоступность означает ненулевой exit code. JSON содержит безопасные `stage`/`code` и режим/источник/причину AI, без сырого текста ошибки провайдера. `--wait-seconds 30` ждёт запуска health; анализ не повторяется автоматически. `--output <file.json>` сохраняет отчёт. Редиректы запрещены, HTTP-прокси из окружения не используются.
+
+Конечная проверка всего образа:
+
+```powershell
+python deploy/container_check.py --build --browser
+python deploy/container_check.py --mode fallback --browser
+```
+
+Создаёт уникальный временный контейнер на свободном localhost-порту, проверяет smoke, UID/упаковку, запускает pytest и при `--browser` — headless Chromium. Контейнер удаляется в `finally`; обычные контейнеры проекта не затрагиваются. Образ остаётся `akim-city:ops-check`. Ключи не передаются. Нужны Python-зависимости; для браузера — Node и Edge/Chromium. Подробности: [tests/e2e](../tests/e2e/README.md).
 
 ## Состав образа
 
@@ -50,7 +73,10 @@ python -m pytest tests/e2e -q -rs -p no:cacheprovider
 | `VITE_API_URL` | Сборка | В Dockerfile `/`, запросы на текущий origin. Пустое значение в текущем frontend включает localhost |
 | `FRONTEND_DIST` | Запуск | Необязательный путь статики, по умолчанию `/app/frontend/dist` |
 | `OPENAI_API_KEY` | Запуск | Секрет платформы или локальный `--env-file .env`; никогда build arg или `VITE_*` |
-| `OPENAI_MODEL` | Запуск | Будет использован после реализации провайдера; модель согласует LEAD |
+| `OPENAI_MODEL` | Запуск | По умолчанию `gpt-4.1-mini`; модель и доступ согласует LEAD |
+| `AI_TIMEOUT_SECONDS` | Запуск | Общий deadline, по умолчанию и максимум 12 секунд |
+| `AI_REQUEST_TIMEOUT_SECONDS` | Запуск | Deadline попытки, по умолчанию и максимум 12 секунд |
+| `AI_CACHE_ENABLED` | Запуск | По умолчанию `true`; успешные ответы кэшируются в памяти |
 
 `DATABASE_URL` текущему приложению не нужен. Ключ сам по себе не включает LLM.
 
@@ -58,7 +84,7 @@ python -m pytest tests/e2e -q -rs -p no:cacheprovider
 
 1. Войти своим аккаунтом и дать Render доступ к командному GitHub-репозиторию. Выбрать ветку с OPS-коммитом, для финального релиза — интегрированный `main`.
 2. Создать Blueprint с путём `deploy/render.yaml`. Альтернатива: Web Service, Docker runtime, build context `.`, Dockerfile `deploy/Dockerfile`, план Free.
-3. Установить health path `/api/health`, оставить команду запуска Dockerfile, `AI_MODE=mock` и пустой `CORS_ORIGINS`.
+3. Установить health path `/api/health`, оставить команду запуска Dockerfile и пустой `CORS_ORIGINS`. Blueprint стартует в mock. Для финального live задать `AI_MODE=live`, секрет `OPENAI_API_KEY` и `OPENAI_MODEL` в настройках сервиса.
 4. Выполнить deploy, дождаться сборки и health-check. Скопировать фактически выданный HTTPS URL.
 5. Выполнить приёмку ниже; записать URL и commit в `docs/deployment-status.md` и README. Автодеплой в Blueprint выключен, следующие релизы запускать после проверок.
 
@@ -80,10 +106,10 @@ python -m pytest tests/e2e -q -rs -p no:cacheprovider
 ```powershell
 python deploy/smoke.py https://YOUR-SERVICE.onrender.com --require-https --expected-ai-mode mock
 $env:API_URL = 'https://YOUR-SERVICE.onrender.com'
-python -m pytest tests/e2e -q -rs -p no:cacheprovider
+python -m pytest tests/e2e --require-api --expected-ai-mode mock -q -p no:cacheprovider
 ```
 
-После подключения живой LLM ожидать `live`: fallback тогда даст FAIL. Успех mock подтверждает доступность и расчёт, не обязательный критерий AI.
+Для финального live заменить `mock` на `live` в обеих командах: fallback тогда даст FAIL. Первый smoke после перезапуска выполнить с `--require-provider`, до браузерных запросов. Успех mock подтверждает доступность и расчёт, не обязательный критерий AI. Удалённые live-тесты могут расходовать квоту.
 
 В браузере из другой сети: пример 95 / 56.54 / +3.99, затем M7 в Есиле и другой Score. В DevTools `/api/*` должен идти на публичный origin без localhost, CORS и mixed-content ошибок. Полный [чек-лист](../docs/judges-checklist.md).
 
