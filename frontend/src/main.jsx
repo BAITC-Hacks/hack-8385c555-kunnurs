@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api } from './api';
-import { DEMO_DECISIONS, previewScenario } from './scenario';
+import { DEMO_DECISIONS, METRICS, previewScenario } from './scenario';
 import { ScenarioEditor } from './components/ScenarioEditor';
 import { DistrictResults } from './components/DistrictResults';
 import { AnalysisPanel } from './components/AnalysisPanel';
@@ -131,7 +131,11 @@ function App() {
 
     <main id="top">
       <section className="hero" aria-labelledby="hero-title">
-        <div className="hero-copy"><span className="hero-eyebrow">ГОРОДСКОЙ СИМУЛЯТОР · HACKALEM AI</span>
+        <svg className="hero-skyline" viewBox="0 0 920 260" fill="none" aria-hidden="true" focusable="false">
+          <path d="M0 243H920M31 242v-68h58v68m-48-68v-29h38v29m33 68V97h72v145m-60-112h48m-48 26h48m-48 26h48m-48 26h48m32 34V161h53v81m-42-61h31m-31 22h31m44 39V91h16V58h12V35h9V58h12v33h16v151m-57-151h57m-47 29h37m-37 29h37m-37 29h37m-37 29h37m65 36V124h67v118m-55-87h43m-43 27h43m-43 27h43m36 33V73h98v169m-83-137h68m-68 28h68m-68 28h68m-68 28h68m-68 28h68m33 25v-63h66v63m-54-38h42m41 38V137h73v105m-61-77h49m-49 26h49m-49 26h49" stroke="currentColor" strokeWidth="2" />
+          <circle cx="307" cy="34" r="15" stroke="currentColor" strokeWidth="2" /><path d="M290 35h34M302 19v-13m10 13v-13" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        <div className="hero-copy"><span className="hero-eyebrow">HACKALEM AI · СИМУЛЯТОР ГОРОДА</span>
           <h1 id="hero-title">Пять решений.<br /><em>Один город.</em></h1>
           <p>Распределите 100 условных единиц между городскими инициативами и увидьте, как изменится качество жизни пяти районов за два условных года.</p>
           <div className="hero-actions"><a className="button button--primary" href="#scenario">Собрать сценарий <span aria-hidden="true">→</span></a><span>Все данные синтетические. Это учебная модель, не прогноз для Астаны.</span></div>
@@ -143,6 +147,15 @@ function App() {
           <div className="score-panel__meta"><div><span>Исходный Score</span><b>{baseline ? score(baseline.score) : '—'}</b></div>
             <div><span>Критических значений</span><b>{result?.critical_count ?? '—'}</b></div>
             <div><span>Остаток бюджета</span><b>{response ? `${result.remaining_budget} ед.` : '100 ед.'}</b></div></div>
+          {result && <div className="score-panel__districts" aria-label="Баллы пяти районов">
+            <div className="score-panel__chart-heading"><span>РАЙОНЫ ГОРОДА</span><span>Score / 100</span></div>
+            <div className="score-panel__bars">{result.districts.map((district) =>
+              <div className="score-panel__bar-group" key={district.district_id} title={`${district.name}: ${score(district.score)}`}>
+                <span className="score-panel__bar-value">{score(district.score)}</span>
+                <span className="score-panel__bar-track"><span style={{ height: `${Math.max(0, Math.min(100, district.score))}%` }} /></span>
+                <span className="score-panel__district-name">{district.name}</span>
+              </div>)}</div>
+          </div>}
         </div>
       </section>
 
@@ -150,7 +163,13 @@ function App() {
       {loadError && <section className="panel error-panel" role="alert"><h2>Не удалось подключиться к backend</h2><p>{loadError}</p><p>Проверьте, что API запущен и адрес в <code>frontend/.env.local</code> верный.</p><button type="button" className="button button--primary" onClick={() => setLoadAttempt((count) => count + 1)}>Повторить подключение</button></section>}
 
       {catalog && baseline && !loadError && <>
-        <div className="context-strip"><span>5 районов</span><span>10 показателей</span><span>14 мероприятий</span><span>8 кварталов</span><small>Версия данных: {catalog.version}</small></div>
+        <div className="context-strip" aria-label="Параметры модели">
+          <div><strong>{catalog.districts.length.toString().padStart(2, '0')}</strong><span>районов</span></div>
+          <div><strong>{METRICS.length.toString().padStart(2, '0')}</strong><span>показателей</span></div>
+          <div><strong>{catalog.measures.length.toString().padStart(2, '0')}</strong><span>мер в каталоге</span></div>
+          <div><strong>{catalog.rules.horizon_quarters.toString().padStart(2, '0')}</strong><span>кварталов модели</span></div>
+          <small>СИНТЕТИЧЕСКИЕ ДАННЫЕ<br /><b>{catalog.version}</b></small>
+        </div>
         <ScenarioEditor catalog={catalog} decisions={decisions} preview={preview} busy={busy} onChange={changeDecision} onSubmit={calculate} onRestore={restoreDemo} onClear={clearDecisions} />
         {requestError && <div className="request-error" role="alert"><div><strong>Сценарий не рассчитан</strong><p>{requestError}</p></div><button type="button" className="button button--light" onClick={calculate}>Повторить</button></div>}
         <DistrictResults catalog={catalog} baseline={baseline} result={result} selectedDistrict={selectedDistrict} onSelect={setSelectedDistrict} hasScenario={Boolean(response)} />
