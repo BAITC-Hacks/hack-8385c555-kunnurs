@@ -44,7 +44,8 @@ def test_full_release_probe_offline(fetch):
     assert report["status"] == "ok"
     assert report["score"] == 56.54307
     assert report["school_in_esil_score"] == 55.29777
-    assert report["alternatives"] == 3
+    # The best Score and fewest critical values select the same replacement.
+    assert report["alternatives"] == 2
     assert report["ai_source"] == "template"
 
 

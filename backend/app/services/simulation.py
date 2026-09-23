@@ -5,7 +5,7 @@ from math import fsum
 
 from contracts.schemas import (
     AppliedSynergy, Catalog, CriticalIndicator, Decision, DistrictResult,
-    MeasureEffect, ScenarioRequest, SimulationResult, ValidationIssue,
+    MeasureContribution, MeasureEffect, ScenarioRequest, SimulationResult, ValidationIssue,
 )
 
 
@@ -134,3 +134,26 @@ def evaluate(request: ScenarioRequest, catalog: Catalog) -> SimulationResult:
     if issues:
         raise InvalidScenario(issues)
     return _calculate(request.decisions, catalog)
+
+
+def leave_one_out(result: SimulationResult, catalog: Catalog) -> list[MeasureContribution]:
+    """Internal counterfactual only: public evaluate still requires five decisions.
+
+    Recompute from baseline without each measure, including loss of its synergies,
+    clipping, weakest district and critical penalties. Do not sum these effects.
+    """
+    measures = {m.id: m for m in catalog.measures}
+    decisions = [
+        Decision(measure_id=e.measure_id, district_id=e.district_ids[0] if measures[e.measure_id].scope == "district" else None)
+        for e in result.measure_effects
+    ]
+    contributions = []
+    for decision in decisions:
+        without = _calculate([d for d in decisions if d != decision], catalog)
+        contributions.append(MeasureContribution(
+            decision=decision, cost=measures[decision.measure_id].cost,
+            score_without=without.score,
+            score_contribution=round(result.score - without.score, 6),
+            critical_count_without=without.critical_count,
+        ))
+    return sorted(contributions, key=lambda c: (-c.score_contribution, c.decision.measure_id))

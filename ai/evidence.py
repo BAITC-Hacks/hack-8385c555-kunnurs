@@ -2,7 +2,9 @@
 
 from collections import Counter
 
-from contracts.schemas import AnalysisEvidence, Catalog, ScenarioAlternative, SimulationResult
+from backend.app.services.advice import METRIC_NAMES
+from backend.app.services.simulation import leave_one_out
+from contracts.schemas import AnalysisEvidence, Catalog, MeasureContribution, ScenarioAlternative, SimulationResult
 
 DIRECTIONS = {
     "transport": "транспорт", "ecology": "экология", "social": "соцсфера",
@@ -20,26 +22,56 @@ def build_evidence(
     result: SimulationResult,
     catalog: Catalog,
     alternatives: list[ScenarioAlternative] | None = None,
+    contributions: list[MeasureContribution] | None = None,
 ) -> AnalysisEvidence:
     measures = {m.id: m for m in catalog.measures}
     districts = {d.id: d.name for d in catalog.districts}
+    def describe(decision):
+        measure = measures[decision.measure_id]
+        target = districts[decision.district_id] if decision.district_id else "весь город"
+        return f"{measure.id} «{measure.name}» ({target})"
+
     strengths = {}
-    for district in sorted(result.districts, key=lambda d: (-d.score_delta, d.district_id)):
-        if district.score_delta > 0:
-            strengths[f"gain_{district.district_id}"] = f"{district.name}: районный балл вырос на {district.score_delta:.2f} и достиг {district.score:.2f}. Это результат всего набора мер."
-    if result.critical_count == 0:
-        strengths["no_critical"] = "После выбранных мер ни один показатель районов не находится ниже критического порога 40."
-    for synergy in result.applied_synergies:
-        pair = " + ".join(synergy.measures)
-        effects = ", ".join(f"{metric} {value:+g}" for metric, value in synergy.effects.items())
-        strengths[f"synergy_{'_'.join(synergy.measures)}"] = f"Синергия {pair} в районе {districts[synergy.district_id]}: фиксированный бонус {effects} до ограничения показателей диапазоном 0–100; лаг его не уменьшает."
+    contributions = leave_one_out(result, catalog) if contributions is None else contributions
+    negative = {}
+    for item in contributions:
+        text = (
+            f"{describe(item.decision)}, {item.cost} ед.: вклад в Score {item.score_contribution:+.2f} "
+            f"(leave-one-out: без этой меры {item.score_without:.2f}, с ней {result.score:.2f}). "
+            "При исключении меры пересчитаны её синергии, критические штрафы и слабейший район; вклады не суммируются."
+        )
+        if item.score_contribution > 0:
+            strengths[f"contribution_{item.decision.measure_id}"] = text
+        elif item.score_contribution < 0:
+            negative[f"negative_{item.decision.measure_id}"] = text
     if not strengths:
-        strengths["valid_budget"] = f"Сценарий допустим и укладывается в бюджет: {result.total_cost} из {result.budget}."
+        strengths["no_positive_contribution"] = "Положительный вклад отдельных мер в Score методом leave-one-out не найден."
 
     weakest = min(result.districts, key=lambda d: (d.score, d.district_id))
-    risks = {"weakest_district": f"{weakest.name} — один из районов с минимальным баллом {weakest.score:.2f}. В формуле Score минимальный районный балл имеет вес 30%; средневзвешенный по населению — 70%."}
+    risks = {}
     for item in result.critical_indicators:
-        risks[f"critical_{item.district_id}_{item.metric}"] = f"{districts[item.district_id]}, {item.metric}: {item.value:g} < 40. Этот показатель даёт штраф 1 балл к Score."
+        risks[f"critical_{item.district_id}_{item.metric}"] = f"{districts[item.district_id]}, {item.metric} ({METRIC_NAMES[item.metric]}): {item.value:g} < 40. Этот показатель даёт штраф 1 балл к Score."
+    if result.remaining_budget > 10:
+        risks["unused_budget"] = (
+            f"Неиспользованный бюджет: {result.remaining_budget} из {result.budget} (больше 10). "
+            "Это риск недоиспользования ресурсов: остаток не даёт бонуса к Score. "
+            "Не нужно тратить его ради расхода — сравните проверенные замены."
+        )
+    healthy = {d.id for d in catalog.districts if all(v >= catalog.rules.critical_threshold for v in d.indicators.values())}
+    critical_districts = {item.district_id for item in result.critical_indicators}
+    for item in contributions:
+        target = item.decision.district_id
+        elsewhere = critical_districts - {target}
+        if target in healthy and elsewhere:
+            names = ", ".join(districts[d] for d in sorted(elsewhere))
+            risks[f"allocation_{item.decision.measure_id}"] = (
+                f"Слабое место распределения: {item.cost} ед. на {describe(item.decision)} "
+                f"в районе без исходных показателей <40, пока в других районах ({names}) "
+                "остаются критические значения. Это компромисс приоритетов, а не отсутствие пользы от меры."
+            )
+    risks.update(negative)
+    mandatory_risk_ids = list(risks)
+    risks["weakest_district"] = f"{weakest.name} — один из районов с минимальным баллом {weakest.score:.2f}. В формуле Score минимальный районный балл имеет вес 30%; средневзвешенный по населению — 70%."
     groups = {}
     for effect in result.measure_effects:
         measure = measures[effect.measure_id]
@@ -52,11 +84,6 @@ def build_evidence(
 
     recommendations = {}
     for alternative in alternatives or []:
-        def describe(decision):
-            measure = measures[decision.measure_id]
-            target = districts[decision.district_id] if decision.district_id else "весь город"
-            return f"{measure.id} «{measure.name}» ({target})"
-
         text = (
             f"Вместо {describe(alternative.removed)} выбрать {describe(alternative.added)}. "
             f"Проверено сервером: Score {result.score:.2f} → {alternative.score:.2f} "
@@ -75,4 +102,4 @@ def build_evidence(
             "Перебор всех допустимых замен одного решения не нашёл роста Score. Это не доказывает глобальный оптимум: можно проверить согласованную замену нескольких решений."
             if alternatives is not None else "Альтернативные наборы в этом вызове не рассчитывались. Для конкретного совета нужен повторный анализ через сервер."
         )
-    return AnalysisEvidence(strengths=strengths, risks=risks, recommendations=recommendations)
+    return AnalysisEvidence(strengths=strengths, risks=risks, recommendations=recommendations, mandatory_risk_ids=mandatory_risk_ids)

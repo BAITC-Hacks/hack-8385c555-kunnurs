@@ -89,25 +89,25 @@ try {
   await command('Runtime.enable');
   await command('Network.enable');
   await command('Page.navigate', { url: origin.href });
-  await until(() => evaluate("document.querySelectorAll('.decision').length === 5 && document.body.innerText.includes('52.56')"), 'initial catalog and baseline');
+  await until(() => evaluate("document.querySelectorAll('.decision-card').length === 5 && document.body.innerText.includes('52.56')"), 'initial catalog and baseline');
   await evaluate("document.querySelector('form button').click()");
   await until(() => evaluate("document.body.innerText.includes('56.54') && document.body.innerText.includes('+3.99') && !document.querySelector('form button').disabled"), 'PDF scenario');
   assert(await evaluate("document.querySelector('.notice')?.innerText.length > 0"), 'AI notice missing');
   assert(await evaluate("document.querySelector('.ai-badge')?.innerText.length > 0"), 'AI mode badge missing');
   await evaluate(`(() => {
-    const select = document.querySelector('.decision').querySelectorAll('select')[1];
+    const select = document.querySelector('#district-0');
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'esil');
     select.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
-  await until(() => evaluate("document.querySelector('.decision').querySelectorAll('select')[1].value === 'esil' && !document.querySelector('.notice')"), 'district selection');
+  await until(() => evaluate("document.querySelector('#district-0').value === 'esil' && !document.querySelector('.notice')"), 'district selection');
   await evaluate("document.querySelector('form button').click()");
   await until(() => evaluate("document.body.innerText.includes('55.30') && !document.querySelector('form button').disabled"), 'alternative scenario');
   await evaluate(`(() => {
-    const select = document.querySelector('.decision').querySelectorAll('select')[1];
+    const select = document.querySelector('#district-0');
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'nura');
     select.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
-  await until(() => evaluate("document.querySelector('.decision').querySelectorAll('select')[1].value === 'nura' && !document.querySelector('.notice')"), 'restore district');
+  await until(() => evaluate("document.querySelector('#district-0').value === 'nura' && !document.querySelector('.notice')"), 'restore district');
   await evaluate("document.querySelector('form button').click()");
   await until(() => evaluate("document.body.innerText.includes('56.54') && !document.querySelector('form button').disabled"), 'repeat PDF scenario');
   const analyses = [];
