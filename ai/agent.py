@@ -5,9 +5,10 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable, Mapping
+from typing import Literal
 
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI, OpenAIError
-from pydantic import ValidationError
+from pydantic import Field, ValidationError, create_model
 
 from ai import cache
 from ai.evidence import build_evidence, composition
@@ -81,6 +82,14 @@ def _render(selection: AISelection, evidence: AnalysisEvidence) -> AINarrative:
 
 
 async def _request_selection(settings: AISettings, payload: str, evidence: AnalysisEvidence) -> AISelection:
+    # Constrain generation itself, not just post-validation: M7 is NOT the fact
+    # ID contribution_M7. Static string schemas allowed that common model error.
+    selection_schema = create_model(
+        "ScenarioSelection", __base__=AISelection,
+        strength_ids=(list[Literal[tuple(evidence.strengths)]], Field(min_length=1, max_length=3)),
+        risk_ids=(list[Literal[tuple(evidence.risks)]], Field(min_length=1, max_length=3)),
+        recommendation_ids=(list[Literal[tuple(evidence.recommendations)]], Field(min_length=1, max_length=2)),
+    )
     # Explicit endpoint prevents an inherited OPENAI_BASE_URL from redirecting secrets.
     # The outer deadline also bounds SDK retry-after/backoff and slow streaming bodies.
     async with asyncio.timeout(settings.timeout):
@@ -93,7 +102,7 @@ async def _request_selection(settings: AISettings, payload: str, evidence: Analy
             response = await client.responses.parse(
                 model=settings.model,
                 input=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": payload}],
-                text_format=AISelection,
+                text_format=selection_schema,
                 max_output_tokens=400,
                 store=False,
             )
@@ -107,13 +116,18 @@ def _live(result: SimulationResult, catalog: Catalog, evidence: AnalysisEvidence
         settings = AISettings.from_env()
     except ValidationError:
         return _template(result, catalog, evidence, reason="invalid_configuration")
-    if not settings.api_key.get_secret_value():
-        return _template(result, catalog, evidence, reason="missing_api_key")
     payload = _payload(result, catalog, evidence)
     key = hashlib.sha256(f"{PROMPT_VERSION}\n{settings.model}\n{payload}".encode()).hexdigest()
     selection = cache.get(key) if settings.cache_enabled else None
+    if selection is not None:
+        try:
+            _validate_selection(selection, evidence)
+        except ValueError:
+            selection = None
     source = "cache" if selection is not None else "provider"
     if selection is None:
+        if not settings.api_key.get_secret_value():
+            return _template(result, catalog, evidence, reason="missing_api_key")
         try:
             selection = asyncio.run(_request_selection(settings, payload, evidence))
         except (TimeoutError, APITimeoutError):

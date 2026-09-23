@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "entries": {
+    "64084bfd88d00b5843dcfee83e701dff29e7aa364ecde8185ddd4700a54262aa": {
+      "strength_ids": [
+        "contribution_M7",
+        "contribution_M8"
+      ],
+      "risk_ids": [
+        "lag_1",
+        "lag_3"
+      ],
+      "recommendation_ids": [
+        "replace_M5_saryarka_with_M3_nura"
+      ]
+    },
+    "74ac728f053270c22b1c16594f5634f33aa2d0ffa6d63a7cd13f13b60fb12be6": {
+      "strength_ids": [
+        "contribution_M12",
+        "contribution_M10"
+      ],
+      "risk_ids": [
+        "allocation_M8",
+        "weakest_district"
+      ],
+      "recommendation_ids": [
+        "replace_M7_esil_with_M7_nura"
+      ]
+    },
+    "3c6db59b06497d8c7c5fbfdde32bb317d5ada889fdf715b917f135e2820e765f": {
+      "strength_ids": [
+        "contribution_M8",
+        "contribution_M9"
+      ],
+      "risk_ids": [
+        "lag_4",
+        "lag_3"
+      ],
+      "recommendation_ids": [
+        "search_scope"
+      ]
+    }
+  }
+}
