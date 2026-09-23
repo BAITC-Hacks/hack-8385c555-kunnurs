@@ -98,7 +98,7 @@ with TestClient(app) as client:
 
 async function select(slot, field, value) {
   await evaluate(`(() => {
-    const element = document.querySelectorAll('.decision')[${slot}].querySelectorAll('select')[${field}];
+    const element = document.querySelectorAll('.decision-card')[${slot}].querySelectorAll('select')[${field}];
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(element, ${JSON.stringify(value)});
     element.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
@@ -108,7 +108,7 @@ async function calculated() {
 }
 async function userScenario() {
   await command('Page.navigate', { url: 'http://akim.test/' });
-  await until(() => evaluate("document.querySelectorAll('.decision').length === 5"), 'page loaded');
+  await until(() => evaluate("document.querySelectorAll('.decision-card').length === 5"), 'page loaded');
   await select(0, 0, 'M8'); await select(0, 1, 'almaty');
   await select(1, 0, 'M9'); await select(1, 1, 'esil');
   await evaluate("document.querySelector('form button').click()");
@@ -143,36 +143,41 @@ try {
   await userScenario();
   const risks = await evaluate("document.querySelector('[data-analysis=risks]').innerText");
   assert(risks.includes('S1') && risks.includes('S2') && risks.includes('19 из 100'));
+  assert(await evaluate("document.querySelector('.impact-list').innerText.includes('62.5%')"), 'realized fraction must not round to 63%');
+  const originalScore = lastAnalysis.result.score;
+  await evaluate("document.querySelector('#compare .section-heading button').click()");
+  assert.equal(await evaluate("JSON.parse(localStorage.getItem('akim-saved-scenario-v1')).result.score"), originalScore);
   const choices = structuredClone(lastAnalysis.alternatives);
   assert(choices.length >= 1);
   for (let i = 0; i < choices.length; i++) {
     if (i) await userScenario();
     const chosen = choices[i];
     const count = submissions.length;
-    await evaluate(`(() => { const button = document.querySelectorAll('.alternative button')[${i}]; button.click(); button.click(); })()`);
+    await evaluate(`(() => { const button = document.querySelectorAll('.alternative-card button')[${i}]; button.click(); button.click(); })()`);
     await calculated();
     assert.equal(submissions.length, count + 1, 'double click must not send duplicate requests');
     assert.deepEqual(normalize(submissions.at(-1).decisions), normalize(chosen.scenario.decisions));
     assert.equal(lastAnalysis.result.score, chosen.score);
-    assert.equal(await evaluate("document.querySelectorAll('.stats strong')[1].textContent"), chosen.score.toFixed(2));
-    const form = await evaluate("Array.from(document.querySelectorAll('.decision'), row => { const fields = row.querySelectorAll('select'); return {measure_id: fields[0].value, district_id: fields[1].value || null}; })");
+    assert.equal(await evaluate("document.querySelector('.compare-highlight strong').textContent"), `+${(chosen.score - originalScore).toFixed(2)}`);
+    assert.equal(await evaluate("document.querySelector('.score-panel__value').textContent"), chosen.score.toFixed(2));
+    const form = await evaluate("Array.from(document.querySelectorAll('.decision-card'), row => { const fields = row.querySelectorAll('select'); return {measure_id: fields[0].value, district_id: fields[1].value || null}; })");
     assert.deepEqual(normalize(form), normalize(chosen.scenario.decisions));
-    const cards = await evaluate("Array.from(document.querySelectorAll('.alternative'), card => card.dataset.alternativeId)");
+    const cards = await evaluate("Array.from(document.querySelectorAll('.alternative-card'), card => card.dataset.alternativeId)");
     assert.deepEqual(cards, lastAnalysis.alternatives.map((a) => a.id));
   }
   failNext = true;
-  await evaluate("document.querySelector('.alternative button').click()");
+  await evaluate("document.querySelector('.alternative-card button').click()");
   await until(() => evaluate("document.querySelector('[role=alert]')?.innerText.includes('Тестовый сбой') && !document.querySelector('form button').disabled"), 'recoverable failure');
-  assert.equal(await evaluate("document.querySelectorAll('.alternative').length"), 0);
+  assert.equal(await evaluate("document.querySelectorAll('.alternative-card').length"), 0);
   const failedDraft = structuredClone(submissions.at(-1));
   await evaluate("document.querySelector('form button').click()"); await calculated();
   assert.deepEqual(submissions.at(-1), failedDraft, 'retry must calculate the applied draft');
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   assert(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'mobile horizontal overflow');
   await select(0, 1, 'esil');
-  assert.equal(await evaluate("document.querySelectorAll('.alternative').length"), 0, 'editing invalidates advice');
+  assert.equal(await evaluate("document.querySelectorAll('.alternative-card').length"), 0, 'editing invalidates advice');
   assert.deepEqual(failures, []);
-  console.log(JSON.stringify({ status: 'ok', verifiedReplacements: choices.length, mandatoryRisks: true, applyAndRecalculate: true, duplicateClick: 'blocked', retry: true, mobile: true, provider: 'mock', listeningServer: false }));
+  console.log(JSON.stringify({ status: 'ok', verifiedReplacements: choices.length, mandatoryRisks: true, applyAndRecalculate: true, comparison: true, duplicateClick: 'blocked', retry: true, mobile: true, provider: 'mock', listeningServer: false }));
 } finally {
   for (const waiting of pending.values()) clearTimeout(waiting.timer);
   socket?.close();

@@ -1,126 +1,171 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api } from './api';
-import { applyReplacement } from './scenario';
+import { DEMO_DECISIONS, applyReplacement, previewScenario } from './scenario';
+import { ScenarioEditor } from './components/ScenarioEditor';
+import { DistrictResults } from './components/DistrictResults';
+import { AnalysisPanel } from './components/AnalysisPanel';
+import { ComparePanel } from './components/ComparePanel';
 import './styles.css';
 
-const directions = { transport: 'Транспорт', ecology: 'Озеленение и экология', social: 'Социальная инфраструктура', safety: 'Безопасность', services: 'Городской сервис' };
-const aiModeLabels = { live: 'AI: live', mock: 'AI: шаблон (mock)', fallback: 'AI: шаблон (fallback)' };
-const objectiveLabels = { best_score: 'Лучший Score', lowest_cost: 'Самая дешёвая из улучшающих', most_critical: 'Минимум критических показателей' };
-const demo = [
-  { measure_id: 'M7', district_id: 'nura' },
-  { measure_id: 'M8', district_id: 'nura' },
-  { measure_id: 'M10', district_id: 'nura' },
-  { measure_id: 'M12', district_id: null },
-  { measure_id: 'M5', district_id: 'saryarka' },
-];
+const STORAGE_KEY = 'akim-saved-scenario-v1';
+const score = (value) => Number(value).toFixed(2);
+
+function readSavedScenario() {
+  try {
+    const item = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return item?.result?.dataset_version && typeof item.result.score === 'number' && Array.isArray(item.decisions) ? item : null;
+  } catch {
+    return null;
+  }
+}
 
 function App() {
   const [catalog, setCatalog] = useState(null);
   const [baseline, setBaseline] = useState(null);
-  const [decisions, setDecisions] = useState(demo);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [loadError, setLoadError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [decisions, setDecisions] = useState(DEMO_DECISIONS.map((item) => ({ ...item })));
   const [response, setResponse] = useState(null);
-  const [error, setError] = useState('');
+  const [requestError, setRequestError] = useState('');
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
+  const [selectedDistrict, setSelectedDistrict] = useState('nura');
+  const [saved, setSaved] = useState(readSavedScenario);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setLoadError('');
     Promise.all([api('/api/health'), api('/api/catalog'), api('/api/baseline')])
-      .then(([, data, initial]) => { if (active) { setCatalog(data); setBaseline(initial); } })
-      .catch(() => { if (active) setError('Не удалось загрузить данные. Проверьте доступность сервера и обновите страницу.'); });
+      .then(([, data, initial]) => {
+        if (!active) return;
+        setCatalog(data);
+        setBaseline(initial);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setLoadError(error.message);
+        setLoading(false);
+      });
     return () => { active = false; };
-  }, []);
+  }, [loadAttempt]);
 
-  function update(index, next) {
-    setDecisions((previous) => previous.map((decision, i) => i === index ? next : decision));
+  const preview = useMemo(() => catalog ? previewScenario(decisions, catalog) : null, [decisions, catalog]);
+  const result = response?.result || baseline;
+
+  function changeDecision(index, next) {
+    setDecisions((previous) => previous.map((decision, slot) => slot === index ? next : decision));
     setResponse(null);
-    setError('');
+    setRequestError('');
   }
 
-  async function calculate(nextDecisions = decisions) {
+  function restoreDemo() {
+    setDecisions(DEMO_DECISIONS.map((item) => ({ ...item })));
+    setSelectedDistrict('nura');
+    setResponse(null);
+    setRequestError('');
+  }
+
+  function clearDecisions() {
+    setDecisions(Array.from({ length: catalog.rules.decision_count }, () => ({ measure_id: '', district_id: null })));
+    setResponse(null);
+    setRequestError('');
+  }
+
+  async function requestAnalysis(nextDecisions) {
     if (submitting.current) return;
     submitting.current = true;
     setBusy(true);
-    setError('');
+    setRequestError('');
     setResponse(null);
-    try { setResponse(await api('/api/simulations/analyze', { decisions: nextDecisions })); }
-    catch (cause) { setError(cause.message || 'Ошибка соединения. Попробуйте ещё раз.'); }
-    finally { submitting.current = false; setBusy(false); }
-  }
-
-  function apply(alternative) {
-    if (submitting.current) return;
+    const payload = { decisions: nextDecisions.map(({ measure_id, district_id }) =>
+      district_id == null ? { measure_id } : { measure_id, district_id }) };
     try {
-      const next = applyReplacement(decisions, alternative);
-      setDecisions(next);
-      calculate(next);
-    } catch (cause) { setError(cause.message); }
+      const data = await api('/api/simulations/analyze', { body: payload });
+      if (data.result?.dataset_version !== catalog.version) {
+        throw new Error('Версия данных изменилась. Обновите страницу и рассчитайте набор снова.');
+      }
+      setResponse(data);
+    } catch (error) {
+      setRequestError(error.message || 'Не удалось рассчитать сценарий.');
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
   }
 
-  function describe(decision) {
-    const measure = catalog.measures.find((m) => m.id === decision.measure_id);
-    const district = catalog.districts.find((d) => d.id === decision.district_id);
-    return `${measure.id} · ${measure.name} — ${district?.name || 'Весь город'}`;
+  function calculate(event) {
+    event?.preventDefault();
+    if (!preview?.valid || busy || submitting.current) return;
+    void requestAnalysis(decisions);
   }
 
-  const cost = catalog ? decisions.reduce((sum, decision) => sum + catalog.measures.find((measure) => measure.id === decision.measure_id).cost, 0) : 0;
-  const result = response?.result || baseline;
+  function tryAlternative(alternative) {
+    if (!response || busy || submitting.current || !Array.isArray(alternative?.scenario?.decisions)) return;
+    let nextDecisions;
+    try { nextDecisions = applyReplacement(decisions, alternative); }
+    catch (error) { setRequestError(error.message); return; }
+    if (!previewScenario(nextDecisions, catalog).valid) {
+      setRequestError('Сервер предложил недопустимый набор мер. Обновите страницу и попробуйте снова.');
+      return;
+    }
+    setDecisions(nextDecisions);
+    if (alternative.added?.district_id) setSelectedDistrict(alternative.added.district_id);
+    void requestAnalysis(nextDecisions);
+  }
 
-  return <main>
-    <header><p className="eyebrow">HackAlem AI · городской симулятор</p><h1>Аким на 5 часов</h1><p>Пять решений. Бюджет 100. Два условных года, чтобы улучшить жизнь города.</p></header>
-    {error && <p role="alert" className="error">{error}</p>}
-    {!catalog && !error && <p>Загружаем районы и мероприятия…</p>}
-    {catalog && <>
-      <section className="stats" aria-label="Сводка сценария">
-        <article><span>Бюджет</span><strong className={cost > 100 ? 'danger' : ''}>{cost} / {catalog.rules.budget}</strong></article>
-        <article><span>Astana Quality of Life Score</span><strong>{result.score.toFixed(2)}</strong></article>
-        <article><span>Критические показатели</span><strong>{result.critical_count}</strong></article>
-      </section>
-      <section><h2>Ваши решения</h2><p>Ровно 5 разных мер, не более 2 на направление. Для городских мер район не выбирается.</p>
-        <form onSubmit={(event) => { event.preventDefault(); calculate(); }}><fieldset disabled={busy}>
-          {decisions.map((decision, index) => {
-            const measure = catalog.measures.find((item) => item.id === decision.measure_id);
-            return <div className="decision" key={index}>
-              <label>Решение {index + 1}<select value={decision.measure_id} onChange={(event) => {
-                const next = catalog.measures.find((item) => item.id === event.target.value);
-                update(index, { measure_id: next.id, district_id: next.scope === 'city' ? null : decision.district_id || 'nura' });
-              }}>{Object.entries(directions).map(([key, label]) => <optgroup label={label} key={key}>{catalog.measures.filter((item) => item.direction === key).map((item) => <option value={item.id} key={item.id}>{item.id} · {item.name} · {item.cost} ед.</option>)}</optgroup>)}</select></label>
-              <label>Район<select value={decision.district_id || ''} disabled={measure.scope === 'city'} onChange={(event) => update(index, { ...decision, district_id: event.target.value })}>
-                {measure.scope === 'city' ? <option value="">Весь город</option> : catalog.districts.map((district) => <option value={district.id} key={district.id}>{district.name}</option>)}
-              </select></label>
-              <small>Лаг: {measure.lag_quarters} кв.</small>
-            </div>;
-          })}
-          {cost > catalog.rules.budget && <p className="danger">Превышение бюджета: {cost - catalog.rules.budget}. Измените набор мер.</p>}
-          <button disabled={busy || cost > catalog.rules.budget}>{busy ? 'Считаем…' : 'Рассчитать сценарий'}</button>
-        </fieldset></form>
-      </section>
-      {busy && <p role="status">Рассчитываем выбранный набор и проверяем новые рекомендации…</p>}
-      <section><h2>{response ? 'Результат сценария' : 'Исходное состояние'}</h2>
-        {response && <p>Изменение Score: {result.score_delta > 0 ? '+' : ''}{result.score_delta.toFixed(2)} · Остаток бюджета: {result.remaining_budget}</p>}
-        <div className="table-scroll"><table><thead><tr><th>Район</th><th>Баллы</th><th>Изменение</th></tr></thead><tbody>{result.districts.map((district) => <tr key={district.district_id}><td>{district.name}</td><td>{district.score.toFixed(2)}</td><td>{district.score_delta > 0 ? '+' : ''}{district.score_delta.toFixed(2)}</td></tr>)}</tbody></table></div>
-        <p className="muted">Score = 0.7 × средний балл + 0.3 × балл слабейшего района − число показателей ниже 40.</p>
-      </section>
-      {response && <section aria-live="polite"><h2>Объяснение результата</h2><div className="analysis-status"><span className="ai-badge">{aiModeLabels[response.analysis.mode]}</span><p className="notice">{response.analysis.notice}</p></div><p>{response.analysis.summary}</p>
-        {[['Сильные стороны', 'strengths'], ['Риски и компромиссы', 'risks']].map(([label, key]) => <div key={key} data-analysis={key}><h3>{label}</h3><ul>{response.analysis[key].map((text, index) => <li key={index}>{text}</li>)}</ul></div>)}
-        <div data-analysis="recommendations"><h3>Следующий шаг</h3>
-          {response.alternatives?.length ? <>
-            <p className="muted">Проверены все допустимые замены одного решения. Одна карточка может быть лучшей по нескольким критериям. «Применить» заменит одну меру в форме и пересчитает набор; прежние советы исчезнут.</p>
-            <div className="alternatives">{response.alternatives.map((alternative) => <article className="alternative" data-alternative-id={alternative.id} key={alternative.id}>
-              <div className="objective-labels">{(alternative.objectives || []).map((objective) => <span key={objective}>{objectiveLabels[objective]}</span>)}</div>
-              <p><span className="muted">Заменить:</span> {describe(alternative.removed)}</p>
-              <p><strong>На:</strong> {describe(alternative.added)}</p>
-              <p>Score: {result.score.toFixed(2)} → <strong>{alternative.score.toFixed(2)}</strong> (+{alternative.score_gain.toFixed(2)})<br />Бюджет: {result.total_cost} → {alternative.total_cost}/100 · Остаток: {alternative.remaining_budget}<br />Критические: {result.critical_count} → {alternative.critical_count}</p>
-              {alternative.tradeoffs.length ? <div><strong>Ухудшения относительно текущего набора:</strong><ul>{alternative.tradeoffs.map((text, i) => <li key={i}>{text}</li>)}</ul></div> : <p>Снижения отдельных показателей нет.</p>}
-              <button type="button" disabled={busy} onClick={() => apply(alternative)} aria-label={`Применить: ${describe(alternative.added)}`}>Применить</button>
-            </article>)}</div>
-          </> : <ul>{response.analysis.recommendations.map((text, index) => <li key={index}>{text}</li>)}</ul>}
+  function saveComparison() {
+    if (!response?.result) return;
+    const item = { decisions: decisions.map((decision) => ({ ...decision })), result: response.result };
+    setSaved(item);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(item)); } catch { /* In-memory comparison still works. */ }
+  }
+
+  function clearComparison() {
+    setSaved(null);
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* Storage may be disabled. */ }
+  }
+
+  return <div className="site-shell">
+    <header className="topbar"><a className="brand" href="#top" aria-label="Аким на 5 часов, наверх"><span className="brand-mark" aria-hidden="true">5</span><span>АКИМ <b>НА 5 ЧАСОВ</b></span></a>
+      <nav aria-label="Разделы страницы"><a href="#scenario">Решения</a><a href="#districts">Районы</a><a href="#analysis">AI-анализ</a><a href="#compare">Сравнение</a></nav>
+      <span className={loadError ? 'connection connection--error' : 'connection'}><i aria-hidden="true" />{loadError ? 'API недоступен' : loading ? 'Подключаем API' : 'API подключён'}</span>
+    </header>
+
+    <main id="top">
+      <section className="hero" aria-labelledby="hero-title">
+        <div className="hero-copy"><span className="hero-eyebrow">ГОРОДСКОЙ СИМУЛЯТОР · HACKALEM AI</span>
+          <h1 id="hero-title">Пять решений.<br /><em>Один город.</em></h1>
+          <p>Распределите 100 условных единиц между городскими инициативами и увидьте, как изменится качество жизни пяти районов за два условных года.</p>
+          <div className="hero-actions"><a className="button button--primary" href="#scenario">Собрать сценарий <span aria-hidden="true">→</span></a><span>Все данные синтетические. Это учебная модель, не прогноз для Астаны.</span></div>
         </div>
-      </section>}
-    </>}
-    <footer>Синтетические данные · Учебная модель, не прогноз развития Астаны</footer>
-  </main>;
+        <div className="score-panel" aria-live="polite"><span className="score-panel__eyebrow">ASTANA QUALITY OF LIFE SCORE</span>
+          <span className="score-panel__label">{response ? 'Ваш рассчитанный сценарий' : 'Единое исходное состояние'}</span>
+          <strong className="score-panel__value">{result ? score(result.score) : '—'}</strong>
+          <span className="score-panel__delta">{response ? `${result.score_delta > 0 ? '+' : ''}${score(result.score_delta)} к исходному Score` : 'одинаково для всех участников'}</span>
+          <div className="score-panel__meta"><div><span>Исходный Score</span><b>{baseline ? score(baseline.score) : '—'}</b></div>
+            <div><span>Критических значений</span><b>{result?.critical_count ?? '—'}</b></div>
+            <div><span>Остаток бюджета</span><b>{response ? `${result.remaining_budget} ед.` : '100 ед.'}</b></div></div>
+        </div>
+      </section>
+
+      {loading && <section className="panel loading-panel" aria-live="polite"><span className="spinner" aria-hidden="true" /><div><h2>Загружаем город</h2><p>Получаем каталог, исходные показатели и состояние сервера.</p></div></section>}
+      {loadError && <section className="panel error-panel" role="alert"><h2>Не удалось подключиться к backend</h2><p>{loadError}</p><p>Проверьте, что API запущен и адрес в <code>frontend/.env.local</code> верный.</p><button type="button" className="button button--primary" onClick={() => setLoadAttempt((count) => count + 1)}>Повторить подключение</button></section>}
+
+      {catalog && baseline && !loadError && <>
+        <div className="context-strip"><span>5 районов</span><span>10 показателей</span><span>14 мероприятий</span><span>8 кварталов</span><small>Версия данных: {catalog.version}</small></div>
+        <ScenarioEditor catalog={catalog} decisions={decisions} preview={preview} busy={busy} onChange={changeDecision} onSubmit={calculate} onRestore={restoreDemo} onClear={clearDecisions} />
+        {requestError && <div className="request-error" role="alert"><div><strong>Сценарий не рассчитан</strong><p>{requestError}</p></div><button type="button" className="button button--light" onClick={calculate}>Повторить</button></div>}
+        <DistrictResults catalog={catalog} baseline={baseline} result={result} selectedDistrict={selectedDistrict} onSelect={setSelectedDistrict} hasScenario={Boolean(response)} />
+        <AnalysisPanel result={response?.result} analysis={response?.analysis} alternatives={response?.alternatives} catalog={catalog} busy={busy} onRetry={calculate} onTryAlternative={tryAlternative} />
+        <ComparePanel catalog={catalog} saved={saved} current={response?.result} onSave={saveComparison} onClear={clearComparison} />
+      </>}
+    </main>
+    <footer className="footer"><div><strong>Аким на 5 часов</strong><p>Проверяйте решения на данных, а не на догадках.</p></div><p>Синтетический датасет · Score считает сервер · AI не меняет выбранные меры</p></footer>
+  </div>;
 }
 
 createRoot(document.getElementById('root')).render(<React.StrictMode><App /></React.StrictMode>);
