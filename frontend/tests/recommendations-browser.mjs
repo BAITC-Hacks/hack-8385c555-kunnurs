@@ -97,21 +97,21 @@ with TestClient(app) as client:
 }
 
 async function select(slot, field, value) {
-  await evaluate(`(() => {
-    const element = document.querySelectorAll('.decision-card')[${slot}].querySelectorAll('select')[${field}];
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(element, ${JSON.stringify(value)});
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  await evaluate(`document.querySelectorAll('.decision-card')[${slot}].querySelectorAll('[data-picker-value]')[${field}].scrollIntoView({ block: 'center', behavior: 'instant' })`);
+  await evaluate(`document.querySelectorAll('.decision-card')[${slot}].querySelectorAll('[data-picker-value]')[${field}].click()`);
+  await until(() => evaluate('!!document.querySelector(".choice-popup")'), 'picker open');
+  await evaluate(`document.querySelector('[data-option-value="${value}"]').click()`);
+  await until(() => evaluate('!document.querySelector(".choice-popup")'), 'picker closed after selection');
 }
 async function calculated() {
-  await until(() => evaluate("!!document.querySelector('.notice') && !document.querySelector('form button').disabled"), 'analysis rendered');
+  await until(() => evaluate("!!document.querySelector('.notice') && !document.querySelector('form button[type=submit]').disabled"), 'analysis rendered');
 }
 async function userScenario() {
   await command('Page.navigate', { url: 'http://akim.test/' });
   await until(() => evaluate("document.querySelectorAll('.decision-card').length === 5"), 'page loaded');
   await select(0, 0, 'M8'); await select(0, 1, 'almaty');
   await select(1, 0, 'M9'); await select(1, 1, 'esil');
-  await evaluate("document.querySelector('form button').click()");
+  await evaluate("document.querySelector('form button[type=submit]').click()");
   await calculated();
 }
 const normalize = (decisions) => decisions.map((d) => `${d.measure_id}:${d.district_id || ''}`).sort();
@@ -160,27 +160,27 @@ try {
     assert.equal(lastAnalysis.result.score, chosen.score);
     assert.equal(await evaluate("document.querySelector('.compare-highlight strong').textContent"), `+${(chosen.score - originalScore).toFixed(2)}`);
     assert.equal(await evaluate("document.querySelector('.score-panel__value').textContent"), chosen.score.toFixed(2));
-    const form = await evaluate("Array.from(document.querySelectorAll('.decision-card'), row => { const fields = row.querySelectorAll('select'); return {measure_id: fields[0].value, district_id: fields[1].value || null}; })");
+    const form = await evaluate("Array.from(document.querySelectorAll('.decision-card'), row => { const fields = row.querySelectorAll('[data-picker-value]'); return {measure_id: fields[0].dataset.pickerValue, district_id: fields[1].dataset.pickerValue || null}; })");
     assert.deepEqual(normalize(form), normalize(chosen.scenario.decisions));
     const cards = await evaluate("Array.from(document.querySelectorAll('.alternative-card'), card => card.dataset.alternativeId)");
     assert.deepEqual(cards, lastAnalysis.alternatives.map((a) => a.id));
   }
   failNext = true;
   await evaluate("document.querySelector('.alternative-card button').click()");
-  await until(() => evaluate("document.querySelector('[role=alert]')?.innerText.includes('Тестовый сбой') && !document.querySelector('form button').disabled"), 'recoverable failure');
+  await until(() => evaluate("document.querySelector('[role=alert]')?.innerText.includes('Тестовый сбой') && !document.querySelector('form button[type=submit]').disabled"), 'recoverable failure');
   assert.equal(await evaluate("document.querySelectorAll('.alternative-card').length"), 0);
   const failedDraft = structuredClone(submissions.at(-1));
-  await evaluate("document.querySelector('form button').click()"); await calculated();
+  await evaluate("document.querySelector('form button[type=submit]').click()"); await calculated();
   assert.deepEqual(submissions.at(-1), failedDraft, 'retry must calculate the applied draft');
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   assert(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'mobile horizontal overflow');
-  const beforeLanguage = await evaluate("Array.from(document.querySelectorAll('.decision-card select'), s => s.value)");
+  const beforeLanguage = await evaluate("Array.from(document.querySelectorAll('.decision-card [data-picker-value]'), s => s.dataset.pickerValue)");
   const originalNarrative = await evaluate("Array.from(document.querySelectorAll('[data-original-text]'), el => el.textContent)");
   const requestsBeforeLanguage = submissions.length;
   for (const [locale, heading] of [['en', 'Build your scenario'], ['kk', 'Өз сценарийіңізді құрыңыз'], ['ru', 'Соберите свой сценарий']]) {
     await evaluate(`document.querySelector('[data-language=${locale}]').click()`);
     await until(() => evaluate(`document.documentElement.lang === '${locale}' && document.querySelector('#scenario-title').textContent === ${JSON.stringify(heading)}`), `language ${locale}`);
-    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('.decision-card select'), s => s.value)"), beforeLanguage, 'language must preserve the draft');
+    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('.decision-card [data-picker-value]'), s => s.dataset.pickerValue)"), beforeLanguage, 'language must preserve the draft');
     assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('[data-original-text]'), el => el.textContent)"), originalNarrative, 'server narratives must remain verbatim');
     assert.equal(submissions.length, requestsBeforeLanguage, 'language must not recalculate');
     assert(await evaluate("document.querySelector('.language-switcher').getBoundingClientRect().right <= innerWidth"), 'language control fits mobile screen');
@@ -206,13 +206,63 @@ try {
   await until(() => evaluate("document.documentElement.lang === 'kk' && document.querySelectorAll('.decision-card').length === 5"), 'language persists across reload');
   await evaluate("document.querySelector('#scenario .heading-actions button:last-child').click()");
   await until(() => evaluate("document.querySelector('.validation-area').textContent.includes('Дәл 5 шара таңдаңыз.')"), 'Kazakh validation message');
+  await evaluate("document.querySelector('#measure-0').scrollIntoView({ block: 'center', behavior: 'instant' })");
+  await evaluate("document.querySelector('#measure-0').click()");
+  await until(() => evaluate("document.activeElement.matches('.choice-search input')"), 'search receives focus');
+  const pickerBounds = await evaluate("(() => { const r = document.querySelector('.choice-popup').getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, height: r.height, viewportWidth: innerWidth, viewportHeight: innerHeight }; })()");
+  if (process.env.UI_SCREENSHOT_PATH) {
+    const shot = await command('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(process.env.UI_SCREENSHOT_PATH.replace('.png', '-picker-mobile.png'), Buffer.from(shot.data, 'base64'));
+  }
+  assert(pickerBounds.left >= 0 && pickerBounds.right <= pickerBounds.viewportWidth && pickerBounds.top >= 0 && pickerBounds.bottom <= pickerBounds.viewportHeight && pickerBounds.height <= 341, `compact picker fits mobile viewport: ${JSON.stringify(pickerBounds)}`);
+  await evaluate(`(() => { const input = document.querySelector('.choice-search input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'M8'); input.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  await until(() => evaluate("document.querySelectorAll('.choice-option').length === 1"), 'search filters measures');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+  assert.equal(await evaluate('document.activeElement.dataset.optionValue'), 'M8');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
+  await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await until(() => evaluate("document.querySelector('#measure-0').dataset.pickerValue === 'M8' && !document.querySelector('.choice-popup')"), 'keyboard selects measure');
+  assert.equal(await evaluate('document.activeElement.id'), 'measure-0');
+  await evaluate("document.querySelector('#measure-0').click()");
+  await until(() => evaluate("!!document.querySelector('.choice-popup')"), 'picker reopens');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await until(() => evaluate("!document.querySelector('.choice-popup')"), 'Escape closes picker');
+  assert.equal(await evaluate("document.querySelector('#measure-0').dataset.pickerValue"), 'M8');
+  await select(0, 0, 'M12');
+  assert(await evaluate("document.querySelector('#district-0').disabled"), 'city measure disables district choice');
+  await select(0, 0, 'M7');
+  await select(0, 1, 'nura');
+  await evaluate("document.querySelector('[data-language=en]').click()");
+  await until(() => evaluate("document.documentElement.lang === 'en'"), 'English picker');
+  await evaluate("document.querySelector('#measure-0').click()");
+  await until(() => evaluate("!!document.querySelector('.choice-popup')"), 'English options visible');
+  assert(await evaluate("!/[А-Яа-яЁё]/.test(document.querySelector('.choice-popup').innerText)"), 'popup copy is translated');
+  await until(() => evaluate("getComputedStyle(document.querySelector('.choice-popup')).opacity === '1'"), 'picker animation complete');
+  if (process.env.UI_SCREENSHOT_PATH) {
+    const shot = await command('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(process.env.UI_SCREENSHOT_PATH.replace('.png', '-picker-mobile.png'), Buffer.from(shot.data, 'base64'));
+  }
+  await evaluate("document.querySelector('#scenario-title').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))");
+  await until(() => evaluate("!document.querySelector('.choice-popup')"), 'outside click closes picker');
+  await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  await evaluate("document.querySelector('#measure-0').scrollIntoView({ block: 'center', behavior: 'instant' })");
+  await evaluate("document.querySelector('#measure-0').click()");
+  await until(() => evaluate("!!document.querySelector('.choice-popup')"), 'desktop picker');
+  await until(() => evaluate("getComputedStyle(document.querySelector('.choice-popup')).opacity === '1'"), 'desktop picker animation complete');
+  assert(await evaluate("(() => { const r = document.querySelector('.choice-popup').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.width <= 800 && r.height <= 341; })()"), 'desktop picker is compact');
+  if (process.env.UI_SCREENSHOT_PATH) {
+    const shot = await command('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(process.env.UI_SCREENSHOT_PATH.replace('.png', '-picker-desktop.png'), Buffer.from(shot.data, 'base64'));
+  }
+  assert(await evaluate("!document.body.innerText.includes('backend') && !document.body.innerText.includes('API') && !document.body.innerText.includes('hackalem-districts-v1')"), 'technical implementation copy removed');
+  await evaluate("document.querySelector('#measure-0').click()");
   if (process.env.UI_SCREENSHOT_PATH) {
     await evaluate('window.scrollTo(0, 0)');
     const shot = await command('Page.captureScreenshot', { format: 'png' });
     writeFileSync(process.env.UI_SCREENSHOT_PATH, Buffer.from(shot.data, 'base64'));
   }
   assert.deepEqual(failures, []);
-  console.log(JSON.stringify({ status: 'ok', verifiedReplacements: choices.length, mandatoryRisks: true, applyAndRecalculate: true, comparison: true, duplicateClick: 'blocked', retry: true, mobile: true, languages: ['ru', 'kk', 'en'], languagePersistence: true, keyboard: true, provider: 'mock', listeningServer: false }));
+  console.log(JSON.stringify({ status: 'ok', verifiedReplacements: choices.length, mandatoryRisks: true, applyAndRecalculate: true, comparison: true, duplicateClick: 'blocked', retry: true, mobile: true, languages: ['ru', 'kk', 'en'], languagePersistence: true, keyboard: true, customPicker: true, search: true, provider: 'mock', listeningServer: false }));
 } finally {
   for (const waiting of pending.values()) clearTimeout(waiting.timer);
   socket?.close();

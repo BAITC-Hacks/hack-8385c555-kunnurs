@@ -133,7 +133,7 @@ function App() {
   return <Localized><div className="site-shell">
     <header className="topbar"><a className="brand" href="#top" aria-label="Аким на 5 часов, наверх"><span className="brand-mark" aria-hidden="true">5</span><span>АКИМ <b>НА 5 ЧАСОВ</b></span></a>
       <nav aria-label="Разделы страницы"><a href="#scenario">Решения</a><a href="#districts">Районы</a><a href="#analysis">AI-анализ</a><a href="#compare">Сравнение</a></nav>
-      <div className="topbar-tools"><span className={loadError ? 'connection connection--error' : 'connection'}><i aria-hidden="true" />{loadError ? 'API недоступен' : loading ? 'Подключаем API' : 'API подключён'}</span><LanguageSwitcher /></div>
+      <div className="topbar-tools"><span className={loadError ? 'connection connection--error' : 'connection'}><i aria-hidden="true" />{loadError ? 'Нет соединения' : loading ? 'Загружаем данные' : 'Готов к работе'}</span><LanguageSwitcher /></div>
     </header>
 
     <main id="top">
@@ -153,11 +153,11 @@ function App() {
         </div>
       </section>
 
-      {loading && <section className="panel loading-panel" aria-live="polite"><span className="spinner" aria-hidden="true" /><div><h2>Загружаем город</h2><p>Получаем каталог, исходные показатели и состояние сервера.</p></div></section>}
-      {loadError && <section className="panel error-panel" role="alert"><h2>Не удалось подключиться к backend</h2><p>{loadError}</p><p>Проверьте, что API запущен и адрес в <code>frontend/.env.local</code> верный.</p><button type="button" className="button button--primary" onClick={() => setLoadAttempt((count) => count + 1)}>Повторить подключение</button></section>}
+      {loading && <section className="panel loading-panel" aria-live="polite"><span className="spinner" aria-hidden="true" /><div><h2>Загружаем город</h2><p>Готовим районы, показатели и доступные меры.</p></div></section>}
+      {loadError && <section className="panel error-panel" role="alert"><h2>Не удалось загрузить город</h2><p>Проверьте подключение к интернету и попробуйте ещё раз.</p><button type="button" className="button button--primary" onClick={() => setLoadAttempt((count) => count + 1)}>Повторить подключение</button></section>}
 
       {catalog && baseline && !loadError && <>
-        <div className="context-strip"><span>5 районов</span><span>10 показателей</span><span>14 мероприятий</span><span>8 кварталов</span><small>Версия данных: {catalog.version}</small></div>
+        <div className="context-strip"><span>5 районов</span><span>10 показателей</span><span>14 мероприятий</span><span>8 кварталов</span></div>
         <ScenarioEditor catalog={catalog} decisions={decisions} preview={preview} busy={busy} onChange={changeDecision} onSubmit={calculate} onRestore={restoreDemo} onClear={clearDecisions} />
         {requestError && <div className="request-error" role="alert"><div><strong>Сценарий не рассчитан</strong><p>{requestError}</p></div><button type="button" className="button button--light" onClick={calculate}>Повторить</button></div>}
         <DistrictResults catalog={catalog} baseline={baseline} result={result} selectedDistrict={selectedDistrict} onSelect={setSelectedDistrict} hasScenario={Boolean(response)} />
@@ -165,7 +165,7 @@ function App() {
         <ComparePanel catalog={catalog} saved={saved} current={response?.result} onSave={saveComparison} onClear={clearComparison} />
       </>}
     </main>
-    <footer className="footer"><div><strong>Аким на 5 часов</strong><p>Проверяйте решения на данных, а не на догадках.</p></div><p>Синтетический датасет · Score считает сервер · AI не меняет выбранные меры</p></footer>
+    <footer className="footer"><div><strong>Аким на 5 часов</strong><p>Проверяйте решения на данных, а не на догадках.</p></div><p>Учебный симулятор · Астана · HackAlem AI</p></footer>
   </div></Localized>;
 }
 

@@ -6,6 +6,11 @@ const STORAGE_KEY = 'akim-language';
 const languages = [{ code: 'ru', label: 'RU', name: 'Русский' }, { code: 'kk', label: 'ҚАЗ', name: 'Қазақша' }, { code: 'en', label: 'EN', name: 'English' }];
 const groupLabels = { ru: 'Язык интерфейса', kk: 'Интерфейс тілі', en: 'Interface language' };
 
+export function useTranslation() {
+  const { locale } = useContext(LanguageContext);
+  return (text) => translate(text, locale);
+}
+
 export function LanguageProvider({ children }) {
   const [locale, setLocale] = useState(() => {
     try { const saved = localStorage.getItem(STORAGE_KEY); return languages.some((l) => l.code === saved) ? saved : 'ru'; }

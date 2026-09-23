@@ -26,7 +26,6 @@ export function ComparePanel({ catalog, saved, current, onSave, onClear }) {
               <tr><th scope="row">Стоимость</th><td>{saved.result.total_cost} ед.</td><td>{current.total_cost} ед.</td></tr>
               <tr><th scope="row">Слабейший район</th><td>{score(saved.result.weakest_district_score)}</td><td>{score(current.weakest_district_score)}</td></tr>
               <tr><th scope="row">Критические показатели</th><td>{saved.result.critical_count}</td><td>{current.critical_count}</td></tr></tbody></table></div>
-          <p className="table-note">Наборы имеют версию данных {catalog.version}. Сравнение использует только ответы сервера.</p>
         </> : <p className="compare-prompt">Сценарий сохранён. Измените одну из мер или район и рассчитайте новый набор.</p>}
       </> : <div className="empty-state empty-state--compact"><span aria-hidden="true">↗</span><h3>Первый результат ещё не сохранён</h3><p>После расчёта сохраните его здесь. Например, перенесите M7 из Нуры в Есиль и сравните Score.</p></div>}
   </section></Localized>;

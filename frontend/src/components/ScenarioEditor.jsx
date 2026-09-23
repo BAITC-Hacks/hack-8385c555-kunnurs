@@ -1,6 +1,7 @@
 import React from 'react';
 import { DIRECTIONS } from '../scenario';
 import { Localized } from '../i18n';
+import { ChoicePicker } from './ChoicePicker';
 
 function effectText(effects) {
   return Object.entries(effects).map(([metric, value]) => `${metric} ${value > 0 ? '+' : ''}${value}`).join(' · ');
@@ -45,27 +46,16 @@ export function ScenarioEditor({ catalog, decisions, preview, busy, onChange, on
           return <div className={invalid ? 'decision-card decision-card--error' : 'decision-card'} key={index}>
             <span className="decision-number">{String(index + 1).padStart(2, '0')}</span>
             <div className="decision-fields">
-              <label htmlFor={`measure-${index}`}>Мероприятие</label>
-              <select id={`measure-${index}`} value={decision.measure_id} aria-invalid={invalid} onChange={(event) => {
-                const nextMeasure = catalog.measures.find(({ id }) => id === event.target.value);
-                onChange(index, { measure_id: event.target.value, district_id: nextMeasure?.scope === 'district' ? decision.district_id || catalog.districts[0].id : null });
-              }}>
-                <option value="">Выберите меру</option>
-                {Object.entries(DIRECTIONS).map(([direction, name]) =>
-                  <optgroup label={name} key={direction}>{catalog.measures.filter((item) => item.direction === direction).map((item) =>
-                    <option value={item.id} key={item.id}>{item.id} · {item.name}</option>
-                  )}</optgroup>
-                )}
-              </select>
+              <label id={`measure-${index}-label`} htmlFor={`measure-${index}`}>Мероприятие</label>
+              <ChoicePicker id={`measure-${index}`} value={decision.measure_id} invalid={invalid} disabled={busy} searchable placeholder="Выберите меру" options={catalog.measures.map((item) => ({ value: item.id, code: item.id, label: item.name, group: DIRECTIONS[item.direction], cost: item.cost, detail: item.scope === 'city' ? 'Городская мера' : 'Районная мера', lag: item.lag_quarters }))} onChange={(value) => {
+                const nextMeasure = catalog.measures.find(({ id }) => id === value);
+                onChange(index, { measure_id: value, district_id: nextMeasure?.scope === 'district' ? decision.district_id || catalog.districts[0].id : null });
+              }} />
               {measure && <span className="decision-effect">{effectText(measure.effects)} <span>до учёта лага</span></span>}
             </div>
             <div className="decision-district">
-              <label htmlFor={`district-${index}`}>Район</label>
-              <select id={`district-${index}`} value={measure?.scope === 'district' ? decision.district_id || '' : ''} disabled={!measure || measure.scope === 'city'} onChange={(event) => onChange(index, { ...decision, district_id: event.target.value })}>
-                {measure?.scope === 'district'
-                  ? catalog.districts.map((district) => <option value={district.id} key={district.id}>{district.name}</option>)
-                  : <option value="">Весь город</option>}
-              </select>
+              <label id={`district-${index}-label`} htmlFor={`district-${index}`}>Район</label>
+              <ChoicePicker id={`district-${index}`} value={measure?.scope === 'district' ? decision.district_id || '' : ''} disabled={busy || !measure || measure.scope === 'city'} placeholder={measure?.scope === 'city' ? 'Весь город' : 'Выберите район'} options={catalog.districts.map((district) => ({ value: district.id, label: district.name }))} onChange={(value) => onChange(index, { ...decision, district_id: value })} />
             </div>
             <div className="decision-meta">{measure
               ? <><strong>{measure.cost} ед.</strong><span>{measure.scope === 'city' ? 'Городская мера' : 'Районная мера'} · лаг {measure.lag_quarters} кв.</span></>
@@ -76,10 +66,9 @@ export function ScenarioEditor({ catalog, decisions, preview, busy, onChange, on
         <div className={preview.issues.length ? 'validation-area' : 'validation-area validation-area--success'} aria-live="polite">
           {preview.issues.length
             ? <><strong>Проверьте набор решений</strong><ul>{preview.issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.message}</li>)}</ul></>
-            : <p className="validation-success">✓ Набор допустим: {selectedCount} решений, бюджет соблюдён. Итог проверит сервер.</p>}
+            : <p className="validation-success">✓ Набор допустим: {selectedCount} решений, бюджет соблюдён.</p>}
         </div>
-        <div className="form-actions"><button className="button button--primary" type="submit" disabled={!preview.valid || busy}>{busy ? 'Рассчитываем…' : 'Рассчитать и получить AI-анализ'} <span aria-hidden="true">→</span></button>
-          <span>Все вычисления Score выполняет backend.</span></div>
+        <div className="form-actions"><button className="button button--primary" type="submit" disabled={!preview.valid || busy}>{busy ? 'Рассчитываем…' : 'Рассчитать и получить AI-анализ'} <span aria-hidden="true">→</span></button></div>
       </fieldset>
     </form>
   </section></Localized>;

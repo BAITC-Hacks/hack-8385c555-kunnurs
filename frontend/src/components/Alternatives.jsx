@@ -14,8 +14,8 @@ export function Alternatives({ result, alternatives, catalog, busy, onTry }) {
 
   return <Localized><section className="alternatives" aria-labelledby="alternatives-title">
     <div className="alternatives-heading">
-      <div><span className="section-kicker">ПРОВЕРЕНО СЕРВЕРОМ</span><h3 id="alternatives-title">Следующий шаг</h3></div>
-      <p>Проверены все допустимые замены одной меры. Одна карточка может быть лучшей по нескольким критериям. «Применить» изменит форму и пересчитает сценарий; прежние советы исчезнут.</p>
+      <div><span className="section-kicker">ВОЗМОЖНОСТИ ДЛЯ РОСТА</span><h3 id="alternatives-title">Следующий шаг</h3></div>
+      <p>Сравните пользу, стоимость и компромиссы. «Применить» заменит одну меру и рассчитает новый результат.</p>
     </div>
     {alternatives.length ? <div className="alternatives-grid">{alternatives.map((alternative) =>
       <article className="alternative-card" data-alternative-id={alternative.id} key={alternative.id}>
@@ -27,6 +27,6 @@ export function Alternatives({ result, alternatives, catalog, busy, onTry }) {
         {alternative.tradeoffs.length > 0 ? <div className="alternative-card__tradeoffs"><strong>Ухудшения относительно текущего набора</strong><ul data-original-text lang="ru">{alternative.tradeoffs.map((tradeoff) => <li key={tradeoff}>{tradeoff}</li>)}</ul></div> : <p className="table-note">Снижения отдельных показателей нет.</p>}
         <button type="button" className="button button--light" disabled={busy} onClick={() => onTry(alternative)} aria-label={`Применить: ${decisionLabel(alternative.added, catalog)}`}>Применить <span aria-hidden="true">→</span></button>
       </article>)}</div>
-      : <p className="alternatives-empty">Среди замен одной меры сервер не нашёл варианта с более высоким Score. Это не означает, что другие наборы из пяти мер хуже.</p>}
+      : <p className="alternatives-empty">Замена одной меры не повышает Score. Попробуйте другую комбинацию решений.</p>}
   </section></Localized>;
 }

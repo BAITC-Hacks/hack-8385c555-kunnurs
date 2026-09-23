@@ -11,7 +11,7 @@ export async function api(path, { body, timeoutMs = 15000 } = {}) {
     });
   } catch (error) {
     if (error?.name === 'TimeoutError') throw new Error('Сервер не ответил вовремя. Попробуйте ещё раз.');
-    throw new Error('Нет связи с сервером. Проверьте backend и повторите запрос.');
+    throw new Error('Не удалось подключиться. Попробуйте ещё раз через несколько секунд.');
   }
 
   let payload;

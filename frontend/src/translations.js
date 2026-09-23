@@ -1,6 +1,21 @@
 // UI copy only. Dataset values, identifiers and server narratives are unchanged.
 // Each row is [Russian, English, Kazakh]; {n} denotes an existing display value.
 export const messages = [
+  ['Нет соединения', 'No connection', 'Байланыс жоқ'], ['Загружаем данные', 'Loading data', 'Деректер жүктелуде'], ['Готов к работе', 'Ready', 'Жұмысқа дайын'],
+  ['Готовим районы, показатели и доступные меры.', 'Preparing districts, indicators and available measures.', 'Аудандар, көрсеткіштер және қолжетімді шаралар дайындалуда.'],
+  ['Не удалось загрузить город', 'Could not load the city', 'Қаланы жүктеу мүмкін болмады'],
+  ['Проверьте подключение к интернету и попробуйте ещё раз.', 'Check your internet connection and try again.', 'Интернет байланысын тексеріп, қайта көріңіз.'],
+  ['Не удалось подключиться. Попробуйте ещё раз через несколько секунд.', 'Could not connect. Try again in a few seconds.', 'Қосылу мүмкін болмады. Бірнеше секундтан кейін қайталаңыз.'],
+  ['Учебный симулятор · Астана · HackAlem AI', 'Learning simulator · Astana · HackAlem AI', 'Оқу симуляторы · Астана · HackAlem AI'],
+  ['решений, бюджет соблюдён.', 'decisions within budget.', 'шешім, бюджет сақталған.'],
+  ['Узнайте, какие решения помогли городу, где остались риски и что можно улучшить.', 'See which decisions helped the city, where risks remain and what could improve.', 'Қалаға қандай шешімдер көмектескенін, қай жерде тәуекел қалғанын және нені жақсартуға болатынын біліңіз.'],
+  ['Это может занять до 12 секунд.', 'This may take up to 12 seconds.', 'Бұл 12 секундқа дейін созылуы мүмкін.'],
+  ['ВОЗМОЖНОСТИ ДЛЯ РОСТА', 'ROOM TO IMPROVE', 'ЖАҚСАРТУ МҮМКІНДІКТЕРІ'],
+  ['Сравните пользу, стоимость и компромиссы. «Применить» заменит одну меру и рассчитает новый результат.', 'Compare benefits, cost and trade-offs. “Apply” replaces one measure and calculates a new result.', 'Пайдасын, құнын және ымыраларды салыстырыңыз. «Қолдану» бір шараны ауыстырып, жаңа нәтижені есептейді.'],
+  ['Замена одной меры не повышает Score. Попробуйте другую комбинацию решений.', 'Replacing one measure does not improve Score. Try a different combination of decisions.', 'Бір шараны ауыстыру Score-ды арттырмайды. Шешімдердің басқа үйлесімін қолданып көріңіз.'],
+  ['Найти меру или направление', 'Search measures or areas', 'Шараны немесе бағытты іздеу'], ['Поиск мероприятий', 'Search measures', 'Шараларды іздеу'],
+  ['Ничего не найдено. Попробуйте другое название.', 'No matches. Try another name.', 'Ештеңе табылмады. Басқа атауды енгізіңіз.'],
+  ['{0} кв. до начала эффекта', 'Effect starts after {0} qtr.', 'Әсері {0} тоқсаннан кейін басталады'],
   ['Аким на 5 часов', 'Akim for 5 hours', '5 сағатқа әкім'],
   ['Аким на 5 часов, наверх', 'Akim for 5 hours, back to top', '5 сағатқа әкім, жоғарыға'],
   ['АКИМ', 'AKIM', 'ӘКІМ'], ['НА 5 ЧАСОВ', 'FOR 5 HOURS', '5 САҒАТҚА'],
