@@ -18,6 +18,9 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 fieldset { padding: 0; border: 0; margin: 0; min-width: 0; }
 small { padding-bottom: 12px; }
 .error, .notice { padding: 14px; border-radius: 6px; background: #fff2d6; }
+.analysis-status { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.analysis-status .notice { flex: 1 1 300px; margin: 0; }
+.ai-badge { display: inline-block; padding: 7px 12px; border-radius: 999px; background: #e5f1f8; color: #155f8e; font-weight: 700; white-space: nowrap; }
 .error, .danger { color: #a21c1c; }
 .table-scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; text-align: left; }
