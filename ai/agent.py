@@ -4,17 +4,17 @@ import asyncio
 import hashlib
 import json
 import logging
-import re
 from collections.abc import Callable, Mapping
 
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI, OpenAIError
 from pydantic import ValidationError
 
 from ai import cache
+from ai.evidence import build_evidence, composition
 from ai.privacy import redact
 from ai.prompts import PROMPT_VERSION, SYSTEM_PROMPT
 from ai.settings import AISettings
-from contracts.schemas import AINarrative, Analysis, Catalog, SimulationResult
+from contracts.schemas import AINarrative, AISelection, Analysis, AnalysisEvidence, Catalog, ScenarioAlternative, SimulationResult
 
 logger = logging.getLogger(__name__)
 
@@ -42,30 +42,44 @@ def configured_mode(mode: str) -> str:
         return "fallback"
 
 
-def _summary(result: SimulationResult) -> str:
-    return f"Score {result.score:.2f} ({result.score_delta:+.2f} к базе). Использовано {result.total_cost} из {result.budget} единиц бюджета."
+def _summary(result: SimulationResult, catalog: Catalog) -> str:
+    return f"Score {result.score:.2f} ({result.score_delta:+.2f} к базе). Использовано {result.total_cost} из {result.budget} единиц бюджета. " + composition(result, catalog)
 
 
-def _payload(result: SimulationResult, catalog: Catalog) -> str:
+def _payload(result: SimulationResult, catalog: Catalog, evidence: AnalysisEvidence) -> str:
     selected = {effect.measure_id for effect in result.measure_effects}
     data = {
         "result": result.model_dump(mode="json"),
         "rules": catalog.rules.model_dump(),
         "selected_measures": [m.model_dump(mode="json") for m in catalog.measures if m.id in selected],
         "conflicts": [c.model_dump(mode="json") for c in catalog.conflicts],
+        "composition": composition(result, catalog),
+        "evidence": evidence.model_dump(),
     }
     return json.dumps(redact(data), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def _validate_narrative(narrative: AINarrative) -> AINarrative:
-    # Fail closed on generated numeric claims; the UI already shows trusted numbers.
-    for sentence in [*narrative.strengths, *narrative.risks, *narrative.recommendations]:
-        if not sentence.strip() or re.search(r"\d", sentence):
+def _validate_selection(selection: AISelection, evidence: AnalysisEvidence) -> AISelection:
+    for identifiers, allowed in (
+        (selection.strength_ids, evidence.strengths),
+        (selection.risk_ids, evidence.risks),
+        (selection.recommendation_ids, evidence.recommendations),
+    ):
+        if len(identifiers) != len(set(identifiers)) or any(identifier not in allowed for identifier in identifiers):
             raise ValueError("invalid_output")
-    return AINarrative.model_validate(redact(narrative.model_dump()))
+    return selection
 
 
-async def _request_narrative(settings: AISettings, payload: str) -> AINarrative:
+def _render(selection: AISelection, evidence: AnalysisEvidence) -> AINarrative:
+    _validate_selection(selection, evidence)
+    return AINarrative(
+        strengths=[redact(evidence.strengths[key]) for key in selection.strength_ids],
+        risks=[redact(evidence.risks[key]) for key in selection.risk_ids],
+        recommendations=[redact(evidence.recommendations[key]) for key in selection.recommendation_ids],
+    )
+
+
+async def _request_selection(settings: AISettings, payload: str, evidence: AnalysisEvidence) -> AISelection:
     # Explicit endpoint prevents an inherited OPENAI_BASE_URL from redirecting secrets.
     # The outer deadline also bounds SDK retry-after/backoff and slow streaming bodies.
     async with asyncio.timeout(settings.timeout):
@@ -78,45 +92,46 @@ async def _request_narrative(settings: AISettings, payload: str) -> AINarrative:
             response = await client.responses.parse(
                 model=settings.model,
                 input=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": payload}],
-                text_format=AINarrative,
-                max_output_tokens=750,
+                text_format=AISelection,
+                max_output_tokens=400,
                 store=False,
             )
             if response.status != "completed" or response.output_parsed is None:
                 raise ValueError("invalid_output")
-            return _validate_narrative(response.output_parsed)
+            return _validate_selection(response.output_parsed, evidence)
 
 
-def _live(result: SimulationResult, catalog: Catalog) -> Analysis:
+def _live(result: SimulationResult, catalog: Catalog, evidence: AnalysisEvidence) -> Analysis:
     try:
         settings = AISettings.from_env()
     except ValidationError:
-        return _template(result, reason="invalid_configuration")
+        return _template(result, catalog, evidence, reason="invalid_configuration")
     if not settings.api_key.get_secret_value():
-        return _template(result, reason="missing_api_key")
-    payload = _payload(result, catalog)
+        return _template(result, catalog, evidence, reason="missing_api_key")
+    payload = _payload(result, catalog, evidence)
     key = hashlib.sha256(f"{PROMPT_VERSION}\n{settings.model}\n{payload}".encode()).hexdigest()
-    narrative = cache.get(key) if settings.cache_enabled else None
-    source = "cache" if narrative is not None else "provider"
-    if narrative is None:
+    selection = cache.get(key) if settings.cache_enabled else None
+    source = "cache" if selection is not None else "provider"
+    if selection is None:
         try:
-            narrative = asyncio.run(_request_narrative(settings, payload))
+            selection = asyncio.run(_request_selection(settings, payload, evidence))
         except (TimeoutError, APITimeoutError):
-            return _template(result, reason="timeout")
+            return _template(result, catalog, evidence, reason="timeout")
         except APIConnectionError:
-            return _template(result, reason="connection_error")
+            return _template(result, catalog, evidence, reason="connection_error")
         except APIStatusError as exc:
             reason = {401: "authentication_error", 403: "permission_error", 404: "permission_error", 429: "rate_limit"}.get(exc.status_code, "provider_error")
-            return _template(result, reason=reason)
+            return _template(result, catalog, evidence, reason=reason)
         except OpenAIError:
-            return _template(result, reason="provider_error")
+            return _template(result, catalog, evidence, reason="provider_error")
         except (ValidationError, ValueError):
-            return _template(result, reason="invalid_output")
+            return _template(result, catalog, evidence, reason="invalid_output")
         if settings.cache_enabled:
-            cache.put(key, narrative)
+            cache.put(key, selection)
+    narrative = _render(selection, evidence)
     return Analysis(
-        mode="live", source=source, summary=_summary(result), **narrative.model_dump(),
-        notice="AI-разбор по рассчитанным показателям. Рекомендации требуют проверки симулятором." if source == "provider" else "Сохранённый AI-разбор этого сценария. Рекомендации требуют проверки симулятором.",
+        mode="live", source=source, summary=_summary(result, catalog), **narrative.model_dump(),
+        notice="AI-разбор по рассчитанным показателям: модель выбрала приоритетные факты и советы, их текст проверен сервером." if source == "provider" else "Сохранённый AI-разбор: модель выбрала приоритеты, факты и альтернативы проверены сервером.",
     )
 
 
@@ -126,31 +141,24 @@ def explain_scenario(
     *,
     mode: str = "mock",
     tools: Mapping[str, Callable] | None = None,
+    alternatives: list[ScenarioAlternative] | None = None,
 ) -> Analysis:
     # No tool declarations are sent to the model. Arbitrary callbacks are never run.
+    evidence = build_evidence(result, catalog, alternatives)
     if mode == "live":
-        return _live(result, catalog)
-    return _template(result)
+        return _live(result, catalog, evidence)
+    return _template(result, catalog, evidence)
 
 
-def _template(result: SimulationResult, reason: str | None = None) -> Analysis:
+def _template(result: SimulationResult, catalog: Catalog, evidence: AnalysisEvidence, reason: str | None = None) -> Analysis:
     if reason:
         # Only a fixed reason code is logged, never exception bodies, prompts or keys.
         logger.warning("ai_fallback reason=%s", reason)
-    weakest = min(result.districts, key=lambda d: d.score)
-    strongest_gain = max(result.districts, key=lambda d: d.score_delta)
-    risks = ["Модель синтетическая: результат не является прогнозом для реального города."]
-    if result.critical_count:
-        risks.append(f"Осталось критических показателей: {result.critical_count}; каждый уменьшает Score на 1.")
-    else:
-        risks.append("Критических значений ниже 40 нет, но это не означает отсутствия городских проблем.")
-    if any(effect.realized_fraction < 1 for effect in result.measure_effects):
-        risks.append("За 8 кварталов реализуется только часть полного эффекта мер из-за лага.")
     return Analysis(
         mode="fallback" if reason else "mock", source="template", reason=reason,
-        summary=_summary(result),
-        strengths=[f"Наибольший прирост районного балла: {strongest_gain.name} ({strongest_gain.score_delta:+.2f}).", f"Сработало синергий: {len(result.applied_synergies)}."],
-        risks=risks,
-        recommendations=[f"Сравните альтернативы для района {weakest.name}: он определяет 30% итогового Score.", "Проверяйте каждый альтернативный набор расчётом; остаток бюджета бонуса не даёт."],
+        summary=_summary(result, catalog),
+        strengths=[redact(text) for text in list(evidence.strengths.values())[:2]],
+        risks=[redact(text) for text in list(evidence.risks.values())[:2]],
+        recommendations=[redact(text) for text in list(evidence.recommendations.values())[:2]],
         notice=FALLBACK_NOTICES[reason] if reason else "Шаблонное объяснение: включён режим mock.",
     )

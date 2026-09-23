@@ -1,0 +1,49 @@
+"""HTTP contract checks; remote by default, explicit in-process mode for CI."""
+
+from copy import deepcopy
+import json
+import os
+from pathlib import Path
+from urllib.parse import urlsplit
+
+import httpx
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def pytest_addoption(parser):
+    parser.addoption("--in-process", action="store_true", help="Use FastAPI TestClient; no listening server")
+    parser.addoption("--expected-ai-mode", choices=("mock", "live", "fallback"))
+
+
+@pytest.fixture(scope="session")
+def api(request):
+    if request.config.getoption("--in-process"):
+        from fastapi.testclient import TestClient
+        import backend.app.main as main
+
+        expected = request.config.getoption("--expected-ai-mode") or "mock"
+        # Current contract: live is a stub which returns explicit fallback.
+        mode = "mock" if expected == "mock" else "live"
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(main, "AI_MODE", mode)
+            with TestClient(main.app, raise_server_exceptions=False) as client:
+                yield client
+        return
+    url = os.getenv("API_URL", "http://127.0.0.1:8000").rstrip("/")
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"} or not parts.netloc or parts.path or parts.query or parts.fragment or parts.username or parts.password:
+        pytest.fail("API_URL must be an HTTP(S) origin without credentials, path, query or fragment")
+    with httpx.Client(base_url=url, timeout=20, follow_redirects=False, trust_env=False) as client:
+        try:
+            response = client.get("/api/health")
+        except (httpx.ConnectError, httpx.TimeoutException):
+            pytest.skip("API unavailable: start the server separately and set API_URL")
+        assert response.status_code == 200, "API is reachable but health check failed"
+        yield client
+
+
+@pytest.fixture
+def scenario():
+    return deepcopy(json.loads((ROOT / "contracts/examples/scenario.json").read_text(encoding="utf-8")))

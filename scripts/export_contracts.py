@@ -6,6 +6,7 @@ from pathlib import Path
 from ai.agent import explain_scenario
 from backend.app.seed import get_catalog
 from backend.app.services.simulation import InvalidScenario, baseline, evaluate
+from backend.app.services.advice import find_alternatives
 from contracts.schemas import AnalysisResponse, ErrorBody, ErrorResponse, HealthResponse, ScenarioRequest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,7 @@ def example_models() -> dict:
     catalog = get_catalog()
     request = ScenarioRequest.model_validate_json((ROOT / "contracts/examples/scenario.json").read_text(encoding="utf-8"))
     result = evaluate(request, catalog)
+    alternatives = find_alternatives(request, catalog)
     try:
         evaluate(ScenarioRequest(decisions=[]), catalog)
     except InvalidScenario as exc:
@@ -24,7 +26,7 @@ def example_models() -> dict:
         "catalog.json": catalog,
         "baseline.json": baseline(catalog),
         "evaluation.json": result,
-        "analysis.json": AnalysisResponse(result=result, analysis=explain_scenario(result, catalog)),
+        "analysis.json": AnalysisResponse(result=result, alternatives=alternatives, analysis=explain_scenario(result, catalog, alternatives=alternatives)),
         "error.json": error,
     }
 

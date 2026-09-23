@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: akim-city-simulator
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: AI_MODE
+        value: mock
+      - key: CORS_ORIGINS
+        value: ""
